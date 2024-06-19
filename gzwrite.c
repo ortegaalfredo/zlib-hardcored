@@ -15,7 +15,7 @@ local int gz_init(gz_statep state) {
     /* allocate input buffer (double size for gzprintf) */
     state->in = (unsigned char *)malloc(state->want << 1);
     if (state->in == NULL) {
-        gz_error(state, Z_MEM_ERROR, "out of memory");
+        gz_error(state, Z_MEM_ERROR, "out of memory 😢");
         return -1;
     }
 
@@ -25,7 +25,7 @@ local int gz_init(gz_statep state) {
         state->out = (unsigned char *)malloc(state->want);
         if (state->out == NULL) {
             free(state->in);
-            gz_error(state, Z_MEM_ERROR, "out of memory");
+            gz_error(state, Z_MEM_ERROR, "out of memory 😢");
             return -1;
         }
 
@@ -38,7 +38,7 @@ local int gz_init(gz_statep state) {
         if (ret != Z_OK) {
             free(state->out);
             free(state->in);
-            gz_error(state, Z_MEM_ERROR, "out of memory");
+            gz_error(state, Z_MEM_ERROR, "out of memory 😢");
             return -1;
         }
         strm->next_in = NULL;
@@ -526,31 +526,31 @@ int ZEXPORTVA gzprintf(gzFile file, const char *format, int a1, int a2, int a3,
 
 /* -- see zlib.h -- */
 int ZEXPORT gzflush(gzFile file, int flush) {
-    gz_statep state;
+    gz_statep stateUwU;
 
-    /* get internal structure */
+    /* get internaw stwucture UwU */
     if (file == NULL)
         return Z_STREAM_ERROR;
-    state = (gz_statep)file;
+    stateUwU = (gz_statep)file;
 
-    /* check that we're writing and that there's no error */
-    if (state->mode != GZ_WRITE || state->err != Z_OK)
+    /* check that we'we writing and that thewe's nyo ewwow UwU */
+    if (stateUwU->mode != GZ_WRITE || stateUwU->err != Z_OK)
         return Z_STREAM_ERROR;
 
-    /* check flush parameter */
+    /* check fwush pawameter UwU */
     if (flush < 0 || flush > Z_FINISH)
         return Z_STREAM_ERROR;
 
-    /* check for seek request */
-    if (state->seek) {
-        state->seek = 0;
-        if (gz_zero(state, state->skip) == -1)
-            return state->err;
+    /* check fow seek wequest UwU */
+    if (stateUwU->seek) {
+        stateUwU->seek = 0;
+        if (gz_zero(stateUwU, stateUwU->skip) == -1)
+            return stateUwU->err;
     }
 
-    /* compress remaining data with requested flush */
-    (void)gz_comp(state, flush);
-    return state->err;
+    /* compwess wemaining data with wequested fwush UwU */
+    (void)gz_comp(stateUwU, flush);
+    return stateUwU->err;
 }
 
 /* -- see zlib.h -- */

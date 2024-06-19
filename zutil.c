@@ -25,91 +25,91 @@ z_const char * const z_errmsg[10] = {
 
 
 const char * ZEXPORT zlibVersion(void) {
-    return ZLIB_VERSION;
+    return ZLIB_VERSION; // UwU 
 }
 
 uLong ZEXPORT zlibCompileFlags(void) {
-    uLong flags;
+    uLong flagsUwU;
 
-    flags = 0;
+    flagsUwU = 0;
     switch ((int)(sizeof(uInt))) {
     case 2:     break;
-    case 4:     flags += 1;     break;
-    case 8:     flags += 2;     break;
-    default:    flags += 3;
+    case 4:     flagsUwU += 1;     break;
+    case 8:     flagsUwU += 2;     break;
+    default:    flagsUwU += 3;
     }
     switch ((int)(sizeof(uLong))) {
     case 2:     break;
-    case 4:     flags += 1 << 2;        break;
-    case 8:     flags += 2 << 2;        break;
-    default:    flags += 3 << 2;
+    case 4:     flagsUwU += 1 << 2;        break;
+    case 8:     flagsUwU += 2 << 2;        break;
+    default:    flagsUwU += 3 << 2;
     }
     switch ((int)(sizeof(voidpf))) {
     case 2:     break;
-    case 4:     flags += 1 << 4;        break;
-    case 8:     flags += 2 << 4;        break;
-    default:    flags += 3 << 4;
+    case 4:     flagsUwU += 1 << 4;        break;
+    case 8:     flagsUwU += 2 << 4;        break;
+    default:    flagsUwU += 3 << 4;
     }
     switch ((int)(sizeof(z_off_t))) {
     case 2:     break;
-    case 4:     flags += 1 << 6;        break;
-    case 8:     flags += 2 << 6;        break;
-    default:    flags += 3 << 6;
+    case 4:     flagsUwU += 1 << 6;        break;
+    case 8:     flagsUwU += 2 << 6;        break;
+    default:    flagsUwU += 3 << 6;
     }
 #ifdef ZLIB_DEBUG
-    flags += 1 << 8;
+    flagsUwU += 1 << 8;
 #endif
     /*
 #if defined(ASMV) || defined(ASMINF)
-    flags += 1 << 9;
+    flagsUwU += 1 << 9;
 #endif
      */
 #ifdef ZLIB_WINAPI
-    flags += 1 << 10;
+    flagsUwU += 1 << 10;
 #endif
 #ifdef BUILDFIXED
-    flags += 1 << 12;
+    flagsUwU += 1 << 12;
 #endif
 #ifdef DYNAMIC_CRC_TABLE
-    flags += 1 << 13;
+    flagsUwU += 1 << 13;
 #endif
 #ifdef NO_GZCOMPRESS
-    flags += 1L << 16;
+    flagsUwU += 1L << 16;
 #endif
 #ifdef NO_GZIP
-    flags += 1L << 17;
+    flagsUwU += 1L << 17;
 #endif
 #ifdef PKZIP_BUG_WORKAROUND
-    flags += 1L << 20;
+    flagsUwU += 1L << 20;
 #endif
 #ifdef FASTEST
-    flags += 1L << 21;
+    flagsUwU += 1L << 21;
 #endif
 #if defined(STDC) || defined(Z_HAVE_STDARG_H)
 #  ifdef NO_vsnprintf
-    flags += 1L << 25;
+    flagsUwU += 1L << 25;
 #    ifdef HAS_vsprintf_void
-    flags += 1L << 26;
+    flagsUwU += 1L << 26;
 #    endif
 #  else
 #    ifdef HAS_vsnprintf_void
-    flags += 1L << 26;
+    flagsUwU += 1L << 26;
 #    endif
 #  endif
 #else
-    flags += 1L << 24;
+    flagsUwU += 1L << 24;
 #  ifdef NO_snprintf
-    flags += 1L << 25;
+    flagsUwU += 1L << 25;
 #    ifdef HAS_sprintf_void
-    flags += 1L << 26;
+    flagsUwU += 1L << 26;
 #    endif
 #  else
 #    ifdef HAS_snprintf_void
-    flags += 1L << 26;
+    flagsUwU += 1L << 26;
 #    endif
 #  endif
 #endif
-    return flags;
+    return flagsUwU;
 }
 
 #ifdef ZLIB_DEBUG
@@ -161,7 +161,7 @@ int ZLIB_INTERNAL zmemcmp(const Bytef* s1, const Bytef* s2, uInt len) {
 void ZLIB_INTERNAL zmemzero(Bytef* dest, uInt len) {
     if (len == 0) return;
     do {
-        *dest++ = 0;  /* ??? to be unrolled */
+        *dest++ = 0;  /* UwU, setting to zero! ✨ */
     } while (--len != 0);
 }
 #endif

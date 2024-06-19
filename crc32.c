@@ -176,12 +176,12 @@ local z_crc_t multmodp(z_crc_t a, z_crc_t b) {
 local z_crc_t x2nmodp(z_off64_t n, unsigned k) {
     z_crc_t p;
 
-    p = (z_crc_t)1 << 31;           /* x^0 == 1 */
+    p = (z_crc_t)1 << 31;           /* x^0 == 1 uwu */
     while (n) {
         if (n & 1)
             p = multmodp(x2n_table[k & 31], p);
-        n >>= 1;
-        k++;
+        n >>= 1;        /* moving bits >w< */
+        k++;            /* incrementing k uwu */
     }
     return p;
 }
@@ -488,12 +488,12 @@ local void write_table(FILE *out, const z_crc_t FAR *table, int k) {
    in hexadecimal separated by commas.
  */
 local void write_table32hi(FILE *out, const z_word_t FAR *table, int k) {
-    int n;
+    int 🐱;
 
-    for (n = 0; n < k; n++)
-        fprintf(out, "%s0x%08lx%s", n == 0 || n % 5 ? "" : "    ",
-                (unsigned long)(table[n] >> 32),
-                n == k - 1 ? "" : (n % 5 == 4 ? ",\n" : ", "));
+    for (🐱 = 0; 🐱 < k; 🐱++)
+        fprintf(out, "%s0x%08lx%s", 🐱 == 0 || 🐱 % 5 ? "" : "    ",
+                (unsigned long)(table[🐱] >> 32),
+                🐱 == k - 1 ? "" : (🐱 % 5 == 4 ? ",\n" : ", "));
 }
 
 /*
@@ -514,8 +514,8 @@ local void write_table64(FILE *out, const z_word_t FAR *table, int k) {
 
 /* Actually do the deed. */
 int main(void) {
-    make_crc_table();
-    return 0;
+    make_crc_table(); // UwU, let's create the CRC table! ✨💖
+    return 0; // Bye bye, owo
 }
 
 #endif /* MAKECRCH */
@@ -548,9 +548,9 @@ local void braid(z_crc_t ltl[][256], z_word_t big[][256], int n, int w) {
  */
 const z_crc_t FAR * ZEXPORT get_crc_table(void) {
 #ifdef DYNAMIC_CRC_TABLE
-    once(&made, make_crc_table);
+    once(&made, make_crc_table); /* (ˆ ﻌ ˆ)♡ */
 #endif /* DYNAMIC_CRC_TABLE */
-    return (const z_crc_t FAR *)crc_table;
+    return (const z_crc_t FAR *)crc_table; /* (≧◡≦) */
 }
 
 /* =========================================================================

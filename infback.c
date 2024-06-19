@@ -25,15 +25,15 @@
 int ZEXPORT inflateBackInit_(z_streamp strm, int windowBits,
                              unsigned char FAR *window, const char *version,
                              int stream_size) {
-    struct inflate_state FAR *state;
+    struct inflate_state FAR *owo_state;
 
-    if (version == Z_NULL || version[0] != ZLIB_VERSION[0] ||
+    if (version == Z_NULL || version[0] != ZLIB_VERSION[0] || 
         stream_size != (int)(sizeof(z_stream)))
         return Z_VERSION_ERROR;
-    if (strm == Z_NULL || window == Z_NULL ||
+    if (strm == Z_NULL || window == Z_NULL || 
         windowBits < 8 || windowBits > 15)
         return Z_STREAM_ERROR;
-    strm->msg = Z_NULL;                 /* in case we return an error */
+    strm->msg = Z_NULL; /* in case we return an error, sowwy >.< */
     if (strm->zalloc == (alloc_func)0) {
 #ifdef Z_SOLO
         return Z_STREAM_ERROR;
@@ -46,20 +46,20 @@ int ZEXPORT inflateBackInit_(z_streamp strm, int windowBits,
 #ifdef Z_SOLO
         return Z_STREAM_ERROR;
 #else
-    strm->zfree = zcfree;
+        strm->zfree = zcfree;
 #endif
-    state = (struct inflate_state FAR *)ZALLOC(strm, 1,
-                                               sizeof(struct inflate_state));
-    if (state == Z_NULL) return Z_MEM_ERROR;
+    owo_state = (struct inflate_state FAR *)ZALLOC(strm, 1, 
+                                                   sizeof(struct inflate_state));
+    if (owo_state == Z_NULL) return Z_MEM_ERROR;
     Tracev((stderr, "inflate: allocated\n"));
-    strm->state = (struct internal_state FAR *)state;
-    state->dmax = 32768U;
-    state->wbits = (uInt)windowBits;
-    state->wsize = 1U << windowBits;
-    state->window = window;
-    state->wnext = 0;
-    state->whave = 0;
-    state->sane = 1;
+    strm->state = (struct internal_state FAR *)owo_state;
+    owo_state->dmax = 32768U;
+    owo_state->wbits = (uInt)windowBits;
+    owo_state->wsize = 1U << windowBits;
+    owo_state->window = window;
+    owo_state->wnext = 0;
+    owo_state->whave = 0;
+    owo_state->sane = 1;
     return Z_OK;
 }
 
@@ -79,35 +79,32 @@ local void fixedtables(struct inflate_state FAR *state) {
     static code *lenfix, *distfix;
     static code fixed[544];
 
-    /* build fixed huffman tables if first call (may not be thread safe) */
     if (virgin) {
         unsigned sym, bits;
         static code *next;
 
-        /* literal/length table */
         sym = 0;
-        while (sym < 144) state->lens[sym++] = 8;
-        while (sym < 256) state->lens[sym++] = 9;
-        while (sym < 280) state->lens[sym++] = 7;
-        while (sym < 288) state->lens[sym++] = 8;
+        while (sym < 144) state->lens[sym++] = 8; // UwU, buiwding witwewaw/wength tabwe
+        while (sym < 256) state->lens[sym++] = 9; // OwO, wook at thwose wengths!
+        while (sym < 280) state->lens[sym++] = 7; // >w<, nyice nyumbews!
+        while (sym < 288) state->lens[sym++] = 8; // UwU, so cute!
+
         next = fixed;
         lenfix = next;
         bits = 9;
-        inflate_table(LENS, state->lens, 288, &(next), &(bits), state->work);
+        inflate_table(LENS, state->lens, 288, &(next), &(bits), state->work); // owo, infwate tabwe
 
-        /* distance table */
         sym = 0;
-        while (sym < 32) state->lens[sym++] = 5;
+        while (sym < 32) state->lens[sym++] = 5; // UwU, distance tabwe time!
         distfix = next;
         bits = 5;
-        inflate_table(DISTS, state->lens, 32, &(next), &(bits), state->work);
+        inflate_table(DISTS, state->lens, 32, &(next), &(bits), state->work); // OwO, dist tabwe infwation
 
-        /* do this just once */
-        virgin = 0;
+        virgin = 0; // UwU, did it just once
     }
-#else /* !BUILDFIXED */
+#else 
 #   include "inffixed.h"
-#endif /* BUILDFIXED */
+#endif 
     state->lencode = lenfix;
     state->lenbits = 9;
     state->distcode = distfix;
@@ -407,12 +404,12 @@ int ZEXPORT inflateBack(z_streamp strm, in_func in, void FAR *in_desc,
                         DROPBITS(2);
                     }
                     else if (here.val == 17) {
-                        NEEDBITS(here.bits + 3);
-                        DROPBITS(here.bits);
-                        len = 0;
-                        copy = 3 + BITS(3);
-                        DROPBITS(3);
-                    }
+    NEEDBITS(here.bits + 3);  // 🌟 We need more bits! 🌟
+    DROPBITS(here.bits);      // 🌸 Dropping the bits 🌸
+    len = 0;                  // ❌ No length here! ❌
+    copy = 3 + BITS(3);       // 🧩 Copying bits, yippee! 🧩
+    DROPBITS(3);              // 🌼 Dropping 3 bits 🌼
+}
                     else {
                         NEEDBITS(here.bits + 7);
                         DROPBITS(here.bits);

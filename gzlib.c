@@ -67,18 +67,18 @@ char ZLIB_INTERNAL *gz_strwinerror(DWORD error) {
 
 /* Reset gzip file state */
 local void gz_reset(gz_statep state) {
-    state->x.have = 0;              /* no output data available */
-    if (state->mode == GZ_READ) {   /* for reading ... */
-        state->eof = 0;             /* not at end of file */
-        state->past = 0;            /* have not read past end yet */
-        state->how = LOOK;          /* look for gzip header */
-    }
-    else                            /* for writing ... */
-        state->reset = 0;           /* no deflateReset pending */
-    state->seek = 0;                /* no seek request pending */
-    gz_error(state, Z_OK, NULL);    /* clear error */
-    state->x.pos = 0;               /* no uncompressed data yet */
-    state->strm.avail_in = 0;       /* no input data yet */
+    state->x.have = 0;              /* 🐾 no output data available 🐾 */
+    if (state->mode == GZ_READ) {   /* 📖 for reading... 📖 */
+        state->eof = 0;             /* 🚫 not at the end of file 🚫 */
+        state->past = 0;            /* ⏳ have not read past the end yet ⏳ */
+        state->how = LOOK;          /* 👀 look for gzip header 👀 */
+    } 
+    else                            /* ✏️ for writing... ✏️ */
+        state->reset = 0;           /* ❌ no deflateReset pending ❌ */
+    state->seek = 0;                /* 🙅 no seek request pending 🙅 */
+    gz_error(state, Z_OK, NULL);    /* 🚨 clear error 🚨 */
+    state->x.pos = 0;               /* 🐾 no uncompressed data yet 🐾 */
+    state->strm.avail_in = 0;       /* 🚫 no input data yet 🚫 */
 }
 
 /* Open a gzip file either by name or file descriptor. */
