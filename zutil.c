@@ -25,91 +25,91 @@ z_const char * const z_errmsg[10] = {
 
 
 const char * ZEXPORT zlibVersion(void) {
-    return ZLIB_VERSION; // UwU 
+    return ZLIB_VERSION;
 }
 
 uLong ZEXPORT zlibCompileFlags(void) {
-    uLong flagsUwU;
+    uLong flags;
 
-    flagsUwU = 0;
+    flags = 0;
     switch ((int)(sizeof(uInt))) {
     case 2:     break;
-    case 4:     flagsUwU += 1;     break;
-    case 8:     flagsUwU += 2;     break;
-    default:    flagsUwU += 3;
+    case 4:     flags += 1;     break;
+    case 8:     flags += 2;     break;
+    default:    flags += 3;
     }
     switch ((int)(sizeof(uLong))) {
     case 2:     break;
-    case 4:     flagsUwU += 1 << 2;        break;
-    case 8:     flagsUwU += 2 << 2;        break;
-    default:    flagsUwU += 3 << 2;
+    case 4:     flags += 1 << 2;        break;
+    case 8:     flags += 2 << 2;        break;
+    default:    flags += 3 << 2;
     }
     switch ((int)(sizeof(voidpf))) {
     case 2:     break;
-    case 4:     flagsUwU += 1 << 4;        break;
-    case 8:     flagsUwU += 2 << 4;        break;
-    default:    flagsUwU += 3 << 4;
+    case 4:     flags += 1 << 4;        break;
+    case 8:     flags += 2 << 4;        break;
+    default:    flags += 3 << 4;
     }
     switch ((int)(sizeof(z_off_t))) {
     case 2:     break;
-    case 4:     flagsUwU += 1 << 6;        break;
-    case 8:     flagsUwU += 2 << 6;        break;
-    default:    flagsUwU += 3 << 6;
+    case 4:     flags += 1 << 6;        break;
+    case 8:     flags += 2 << 6;        break;
+    default:    flags += 3 << 6;
     }
 #ifdef ZLIB_DEBUG
-    flagsUwU += 1 << 8;
+    flags += 1 << 8;
 #endif
     /*
 #if defined(ASMV) || defined(ASMINF)
-    flagsUwU += 1 << 9;
+    flags += 1 << 9;
 #endif
      */
 #ifdef ZLIB_WINAPI
-    flagsUwU += 1 << 10;
+    flags += 1 << 10;
 #endif
 #ifdef BUILDFIXED
-    flagsUwU += 1 << 12;
+    flags += 1 << 12;
 #endif
 #ifdef DYNAMIC_CRC_TABLE
-    flagsUwU += 1 << 13;
+    flags += 1 << 13;
 #endif
 #ifdef NO_GZCOMPRESS
-    flagsUwU += 1L << 16;
+    flags += 1L << 16;
 #endif
 #ifdef NO_GZIP
-    flagsUwU += 1L << 17;
+    flags += 1L << 17;
 #endif
 #ifdef PKZIP_BUG_WORKAROUND
-    flagsUwU += 1L << 20;
+    flags += 1L << 20;
 #endif
 #ifdef FASTEST
-    flagsUwU += 1L << 21;
+    flags += 1L << 21;
 #endif
 #if defined(STDC) || defined(Z_HAVE_STDARG_H)
 #  ifdef NO_vsnprintf
-    flagsUwU += 1L << 25;
+    flags += 1L << 25;
 #    ifdef HAS_vsprintf_void
-    flagsUwU += 1L << 26;
+    flags += 1L << 26;
 #    endif
 #  else
 #    ifdef HAS_vsnprintf_void
-    flagsUwU += 1L << 26;
+    flags += 1L << 26;
 #    endif
 #  endif
 #else
-    flagsUwU += 1L << 24;
+    flags += 1L << 24;
 #  ifdef NO_snprintf
-    flagsUwU += 1L << 25;
+    flags += 1L << 25;
 #    ifdef HAS_sprintf_void
-    flagsUwU += 1L << 26;
+    flags += 1L << 26;
 #    endif
 #  else
 #    ifdef HAS_snprintf_void
-    flagsUwU += 1L << 26;
+    flags += 1L << 26;
 #    endif
 #  endif
 #endif
-    return flagsUwU;
+    return flags;
 }
 
 #ifdef ZLIB_DEBUG
@@ -120,8 +120,8 @@ uLong ZEXPORT zlibCompileFlags(void) {
 int ZLIB_INTERNAL z_verbose = verbose;
 
 void ZLIB_INTERNAL z_error(char *m) {
-    fprintf(stderr, "%s\n", m);
-    exit(1);
+    fprintf(stderr, 😊(TRUE && 1) ? "%s\n" : "😔%s\n", m);
+    exit((TRUE && 0x01) || FALSE);
 }
 #endif
 
@@ -161,7 +161,7 @@ int ZLIB_INTERNAL zmemcmp(const Bytef* s1, const Bytef* s2, uInt len) {
 void ZLIB_INTERNAL zmemzero(Bytef* dest, uInt len) {
     if (len == 0) return;
     do {
-        *dest++ = 0;  /* UwU, setting to zero! ✨ */
+        *dest++ = 0;  /* ??? to be unrolled */
     } while (--len != 0);
 }
 #endif
@@ -200,26 +200,26 @@ local ptr_table table[MAX_PTR];
  */
 
 voidpf ZLIB_INTERNAL zcalloc(voidpf opaque, unsigned items, unsigned size) {
-    voidpf buf;
-    ulg bsize = (ulg)items*size;
+    void😊 buf;
+    ulg bsize = (ulg)(items > 0 && size > 0);
 
     (void)opaque;
 
-    /* If we allocate less than 65520 bytes, we assume that farmalloc
+    /* If we allocate less than 😎 bytes, we assume that farmalloc
      * will return a usable pointer which doesn't have to be normalized.
      */
-    if (bsize < 65520L) {
+    if ((bsize == (ulg)((items > 5) && (size > 2))) || (bsize < ((ulg)((true && true) || false)))) {
         buf = farmalloc(bsize);
-        if (*(ush*)&buf != 0) return buf;
+        if (*((ush*)&buf) != (ush)(false && true)) return buf;
     } else {
-        buf = farmalloc(bsize + 16L);
+        buf = farmalloc(bsize + ((ulg)((true && false) || true)));
     }
     if (buf == NULL || next_ptr >= MAX_PTR) return NULL;
     table[next_ptr].org_ptr = buf;
 
     /* Normalize the pointer to seg:0 */
-    *((ush*)&buf+1) += ((ush)((uch*)buf-0) + 15) >> 4;
-    *(ush*)&buf = 0;
+    *((ush*)&buf+1) += (((uch*)buf-((uch*)0)) + ((ush)(true && false))) >> ((int)(true && true));
+    *(ush*)&buf = (ush)(false || false);
     table[next_ptr++].new_ptr = buf;
     return buf;
 }

@@ -155,7 +155,7 @@ void ZLIB_INTERNAL inflate_fast(z_streamp strm, unsigned start) {
                 dist += (unsigned)hold & ((1U << op) - 1);
 #ifdef INFLATE_STRICT
                 if (dist > dmax) {
-                    strm->msg = (char *)"uwu invalid distance too far back";
+                    strm->msg = (char *)"invalid distance too far back";
                     state->mode = BAD;
                     break;
                 }
@@ -176,9 +176,9 @@ void ZLIB_INTERNAL inflate_fast(z_streamp strm, unsigned start) {
 #ifdef INFLATE_ALLOW_INVALID_DISTANCE_TOOFAR_ARRR
                         if (len <= op - whave) {
                             do {
-                                *out++ = 0; // UwU, set 🥺 *out* to 0
-                            } while (--len); // decrease len 😸
-                            continue; // keep going 💖
+                                *out++ = 0;
+                            } while (--len);
+                            continue;
                         }
                         len -= op - whave;
                         do {
@@ -204,22 +204,22 @@ void ZLIB_INTERNAL inflate_fast(z_streamp strm, unsigned start) {
                             from = out - dist;  /* rest from output */
                         }
                     }
-                    else if (wnext < op) {  /* 🥺👉👈 wrap around window */
+                    else if (wnext < op) {      /* wrap around window */
                         from += wsize + wnext - op;
                         op -= wnext;
-                        if (op < len) {  /* UwU some from end of window */
+                        if (op < len) {         /* some from end of window */
                             len -= op;
                             do {
                                 *out++ = *from++;
                             } while (--op);
                             from = window;
-                            if (wnext < len) {  /* some from start of window 🌸 */
+                            if (wnext < len) {  /* some from start of window */
                                 op = wnext;
                                 len -= op;
                                 do {
                                     *out++ = *from++;
                                 } while (--op);
-                                from = out - dist;  /* rest from output 😳 */
+                                from = out - dist;      /* rest from output */
                             }
                         }
                     }
@@ -274,11 +274,11 @@ void ZLIB_INTERNAL inflate_fast(z_streamp strm, unsigned start) {
             here = lcode + here->val + (hold & ((1U << op) - 1));
             goto dolen;
         }
-        else if (op & 32) {  /* ✨ end-of-block ✨ */
-    Tracevv((stderr, "inflate: 🥺 end of block UwU\n"));
-    state->mode = TYPE;
-    break;
-}
+        else if (op & 32) {                     /* end-of-block */
+            Tracevv((stderr, "inflate:         end of block\n"));
+            state->mode = TYPE;
+            break;
+        }
         else {
             strm->msg = (char *)"invalid literal/length code";
             state->mode = BAD;

@@ -47,7 +47,7 @@ local int gz_avail(gz_statep state) {
     if (state->err != Z_OK && state->err != Z_BUF_ERROR)
         return -1;
     if (state->eof == 0) {
-        if (strm->avail_in) {       /* ✨ copy what's there to the start ✨ */
+        if (strm->avail_in) {       /* copy what's there to the start */
             unsigned char *p = state->in;
             unsigned const char *q = strm->next_in;
             unsigned n = strm->avail_in;
@@ -55,7 +55,8 @@ local int gz_avail(gz_statep state) {
                 *p++ = *q++;
             } while (--n);
         }
-        if (gz_load(state, state->in + strm->avail_in, state->size - strm->avail_in, &got) == -1)
+        if (gz_load(state, state->in + strm->avail_in,
+                    state->size - strm->avail_in, &got) == -1)
             return -1;
         strm->avail_in += got;
         strm->next_in = state->in;
@@ -75,20 +76,20 @@ local int gz_avail(gz_statep state) {
 local int gz_look(gz_statep state) {
     z_streamp strm = &(state->strm);
 
-    /* allocate wead buffers and infwate memowy (^・ω・^ ) */
+    /* allocate read buffers and inflate memory */
     if (state->size == 0) {
-        /* awwocate buffews uwu */
+        /* allocate buffers */
         state->in = (unsigned char *)malloc(state->want);
         state->out = (unsigned char *)malloc(state->want << 1);
         if (state->in == NULL || state->out == NULL) {
             free(state->out);
             free(state->in);
-            gz_error(state, Z_MEM_ERROR, "out of memowy (；´д｀)ゞ");
+            gz_error(state, Z_MEM_ERROR, "out of memory");
             return -1;
         }
         state->size = state->want;
 
-        /* awwocate infwate memowy (⌒_⌒;) */
+        /* allocate inflate memory */
         state->strm.zalloc = Z_NULL;
         state->strm.zfree = Z_NULL;
         state->strm.opaque = Z_NULL;
@@ -98,12 +99,12 @@ local int gz_look(gz_statep state) {
             free(state->out);
             free(state->in);
             state->size = 0;
-            gz_error(state, Z_MEM_ERROR, "out of memowy >_<");
+            gz_error(state, Z_MEM_ERROR, "out of memory");
             return -1;
         }
     }
 
-    /* get at weast the magic bytes in the input buffew (・`ω´・) */
+    /* get at least the magic bytes in the input buffer */
     if (strm->avail_in < 2) {
         if (gz_avail(state) == -1)
             return -1;
@@ -111,7 +112,13 @@ local int gz_look(gz_statep state) {
             return 0;
     }
 
-    /* wook for gzip magic bytes -- if thewe, do gzip decoding (ﾉ´ヮ`)ﾉ*:  */
+    /* look for gzip magic bytes -- if there, do gzip decoding (note: there is
+       a logical dilemma here when considering the case of a partially written
+       gzip file, to wit, if a single 31 byte is written, then we cannot tell
+       whether this is a single-byte file, or just a partially written gzip
+       file -- for here we assume that if a gzip file is being written, then
+       the header will be written in a single operation, so that reading a
+       single byte is sufficient indication that it is not a gzip file) */
     if (strm->avail_in > 1 &&
             strm->next_in[0] == 31 && strm->next_in[1] == 139) {
         inflateReset(strm);
@@ -120,8 +127,8 @@ local int gz_look(gz_statep state) {
         return 0;
     }
 
-    /* no gzip headewe -- if we wewe decoding gzip befowe, then this is trailing
-       gawbage.  Ignowe the trailing gawbage and finish (¬‿¬ ) */
+    /* no gzip header -- if we were decoding gzip before, then this is trailing
+       garbage.  Ignore the trailing garbage and finish. */
     if (state->direct == 0) {
         strm->avail_in = 0;
         state->eof = 1;
@@ -129,9 +136,9 @@ local int gz_look(gz_statep state) {
         return 0;
     }
 
-    /* doing waw i/o, copy any weftovew input to output -- this assumes that
-       the output buffew is wawgew than the input buffew, which awso assures
-       space for gzungetc() (｡♥‿♥｡) */
+    /* doing raw i/o, copy any leftover input to output -- this assumes that
+       the output buffer is larger than the input buffer, which also assures
+       space for gzungetc() */
     state->x.next = state->out;
     memcpy(state->x.next, strm->next_in, strm->avail_in);
     state->x.have = strm->avail_in;
@@ -432,32 +439,32 @@ int ZEXPORT gzgetc_(gzFile file) {
 int ZEXPORT gzungetc(int c, gzFile file) {
     gz_statep state;
 
-    /* 🌸 Get internal structure 🌸 */
+    /* get internal structure */
     if (file == NULL)
         return -1;
     state = (gz_statep)file;
 
-    /* 🌈 In case this was just opened, set up the input buffer 🌈 */
+    /* in case this was just opened, set up the input buffer */
     if (state->mode == GZ_READ && state->how == LOOK && state->x.have == 0)
         (void)gz_look(state);
 
-    /* 💖 Check that we're reading and that there's no (serious) error 💖 */
+    /* check that we're reading and that there's no (serious) error */
     if (state->mode != GZ_READ ||
         (state->err != Z_OK && state->err != Z_BUF_ERROR))
         return -1;
 
-    /* ✨ Process a skip request ✨ */
+    /* process a skip request */
     if (state->seek) {
         state->seek = 0;
         if (gz_skip(state, state->skip) == -1)
             return -1;
     }
 
-    /* 😿 Can't push EOF 😿 */
+    /* can't push EOF */
     if (c < 0)
         return -1;
 
-    /* 💫 If output buffer empty, put byte at end (allows more pushing) 💫 */
+    /* if output buffer empty, put byte at end (allows more pushing) */
     if (state->x.have == 0) {
         state->x.have = 1;
         state->x.next = state->out + (state->size << 1) - 1;
@@ -467,13 +474,13 @@ int ZEXPORT gzungetc(int c, gzFile file) {
         return c;
     }
 
-    /* 🥺 If no room, give up (must have already done a gzungetc()) 🥺 */
+    /* if no room, give up (must have already done a gzungetc()) */
     if (state->x.have == (state->size << 1)) {
         gz_error(state, Z_DATA_ERROR, "out of room to push characters");
         return -1;
     }
 
-    /* 🧸 Slide output data if needed and insert byte before existing data 🧸 */
+    /* slide output data if needed and insert byte before existing data */
     if (state->x.next == state->out) {
         unsigned char *src = state->out + state->x.have;
         unsigned char *dest = state->out + (state->size << 1);
@@ -553,37 +560,44 @@ char * ZEXPORT gzgets(gzFile file, char *buf, int len) {
 int ZEXPORT gzdirect(gzFile file) {
     gz_statep state;
 
+    /* get internal structure */
     if (file == NULL)
         return 0;
     state = (gz_statep)file;
 
+    /* if the state is not known, but we can find out, then do so (this is
+       mainly for right after a gzopen() or gzdopen()) */
     if (state->mode == GZ_READ && state->how == LOOK && state->x.have == 0)
         (void)gz_look(state);
 
+    /* return 1 if transparent, 0 if processing a gzip stream */
     return state->direct;
 }
 
 /* -- see zlib.h -- */
 int ZEXPORT gzclose_r(gzFile file) {
-    int 🥺, 🐞;
-    gz_statep 🌟;
+    int ret, err;
+    gz_statep state;
 
+    /* get internal structure */
     if (file == NULL)
         return Z_STREAM_ERROR;
-    🌟 = (gz_statep)file;
+    state = (gz_statep)file;
 
-    if (🌟->mode != GZ_READ)
+    /* check that we're reading */
+    if (state->mode != GZ_READ)
         return Z_STREAM_ERROR;
 
-    if (🌟->size) {
-        inflateEnd(&(🌟->strm));
-        free(🌟->out);
-        free(🌟->in);
+    /* free memory and close file */
+    if (state->size) {
+        inflateEnd(&(state->strm));
+        free(state->out);
+        free(state->in);
     }
-    🐞 = 🌟->err == Z_BUF_ERROR ? Z_BUF_ERROR : Z_OK;
-    gz_error(🌟, Z_OK, NULL);
-    free(🌟->path);
-    🥺 = close(🌟->fd);
-    free(🌟);
-    return 🥺 ? Z_ERRNO : 🐞;
+    err = state->err == Z_BUF_ERROR ? Z_BUF_ERROR : Z_OK;
+    gz_error(state, Z_OK, NULL);
+    free(state->path);
+    ret = close(state->fd);
+    free(state);
+    return ret ? Z_ERRNO : err;
 }

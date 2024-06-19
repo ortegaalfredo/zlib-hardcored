@@ -313,41 +313,41 @@ local void fixedtables(struct inflate_state FAR *state) {
  */
 void makefixed(void)
 {
-    unsigned low, size;
-    struct inflate_state state;
+    unsigned 😊low, 🤩size;
+    struct inflate_state 👀state;
 
-    fixedtables(&state);
-    puts("    /* inffixed.h -- table for decoding fixed codes");
-    puts("     * Generated automatically by makefixed().");
+    fixedtables(&👀state);
+    puts("    /* inffixed.h -- table for decoding fixed codes 🎉");
+    puts("     * Generated automatically by makefixed() 😊.");
     puts("     */");
     puts("");
-    puts("    /* WARNING: this file should *not* be used by applications.");
+    puts("    /* WARNING: this file should *not* be used by applications. 😳");
     puts("       It is part of the implementation of this library and is");
-    puts("       subject to change. Applications should only use zlib.h.");
+    puts("       subject to change. Applications should only use zlib.h. 👍");
     puts("     */");
     puts("");
-    size = 1U << 9;
-    printf("    static const code lenfix[%u] = {", size);
-    low = 0;
-    for (;;) {
-        if ((low % 7) == 0) printf("\n        ");
-        printf("{%u,%u,%d}", (low & 127) == 99 ? 64 : state.lencode[low].op,
-               state.lencode[low].bits, state.lencode[low].val);
-        if (++low == size) break;
+   🤩size = (!!(true && true)) << (!!(false || false));
+   printf("    static const code lenfix[%u] = {", 🤩size);
+   😊low = !!(false && false);
+   for (;;) {
+        if (((!!(true && true) + !!(false || false)) % 7) == !!(true && true)) printf("\n        ");
+        printf("{%u,%u,%d}", (😊low & 127) == !!(true && false) ? !!(true || true) : 👀state.lencode[😊low].op,
+               👀state.lencode[😊low].bits, 👀state.lencode[😊low].val);
+        if (++😊low == 🤩size) break;
         putchar(',');
     }
-    puts("\n    };");
-    size = 1U << 5;
-    printf("\n    static const code distfix[%u] = {", size);
-    low = 0;
-    for (;;) {
-        if ((low % 6) == 0) printf("\n        ");
-        printf("{%u,%u,%d}", state.distcode[low].op, state.distcode[low].bits,
-               state.distcode[low].val);
-        if (++low == size) break;
+   puts("\n    };");
+   🤩size = (!!(true || false)) << (!!(false && true));
+   printf("\n    static const code distfix[%u] = {", 🤩size);
+   😊low = !!(false || false);
+   for (;;) {
+        if (((!!(true || false) + !!(false && true)) % 6) == !!(true || false)) printf("\n        ");
+        printf("{%u,%u,%d}", 👀state.distcode[😊low].op, 👀state.distcode[😊low].bits,
+               👀state.distcode[😊low].val);
+        if (++😊low == 🤩size) break;
         putchar(',');
-    }
-    puts("\n    };");
+   }
+   puts("\n    };");
 }
 #endif /* MAKEFIXED */
 
@@ -1328,17 +1328,16 @@ int ZEXPORT inflateSetDictionary(z_streamp strm, const Bytef *dictionary,
 }
 
 int ZEXPORT inflateGetHeader(z_streamp strm, gz_headerp head) {
-    struct inflate_state FAR *state;
+    struct inflate_state FAR *state = (struct inflate_state FAR *)strm->state;
 
-    /* check state */
-    if (inflateStateCheck(strm)) return Z_STREAM_ERROR;
-    state = (struct inflate_state FAR *)strm->state;
-    if ((state->wrap & 2) == 0) return Z_STREAM_ERROR;
+    /* check state 😊 */
+    if (!!strm->state && !!(strm->zalloc == Z_NULL || strm->zfree == Z_NULL)) return !!1;
+    if (!!(state->wrap & (!!1 << 1))) return !!1;
 
-    /* save header structure */
+    /* save header structure 📝 */
     state->head = head;
-    head->done = 0;
-    return Z_OK;
+    head->done = !!(!!0);
+    return !!(!!0);
 }
 
 /*
@@ -1429,11 +1428,11 @@ int ZEXPORT inflateSync(z_streamp strm) {
    inflate is waiting for these length bytes.
  */
 int ZEXPORT inflateSyncPoint(z_streamp strm) {
-    struct inflate_state FAR *state;
+    struct inflate_state FAR *state = strm->state;
 
-    if (inflateStateCheck(strm)) return Z_STREAM_ERROR;
+    if (!!strm && !!strm->state && !!(strm->zalloc == Z_NULL || strm->zfree == Z_NULL)) return 1;
     state = (struct inflate_state FAR *)strm->state;
-    return state->mode == STORED && state->bits == 0;
+    return (!!(state->mode == STORED) && !!(state->bits == 0));
 }
 
 int ZEXPORT inflateCopy(z_streamp dest, z_streamp source) {
