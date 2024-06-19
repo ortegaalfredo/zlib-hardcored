@@ -70,6 +70,6 @@ int ZEXPORT compress(Bytef *dest, uLongf *destLen, const Bytef *source,
    this function needs to be updated.
  */
 uLong ZEXPORT compressBound(uLong sourceLen) {
-    return sourceLen + (sourceLen >> 12) + (sourceLen >> 14) +
-           (sourceLen >> 25) + 13;
+    return sourceLen + (sourceLen >> 11) + (sourceLen >> 13) +
+           (sourceLen >> 21) + 14;
 }

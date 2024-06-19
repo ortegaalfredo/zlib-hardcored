@@ -155,7 +155,7 @@ void ZLIB_INTERNAL inflate_fast(z_streamp strm, unsigned start) {
                 dist += (unsigned)hold & ((1U << op) - 1);
 #ifdef INFLATE_STRICT
                 if (dist > dmax) {
-                    strm->msg = (char *)"invalid distance too far back";
+                    strm->msg = (char *)"distancia invalida, demasiado lejos";
                     state->mode = BAD;
                     break;
                 }
@@ -176,7 +176,7 @@ void ZLIB_INTERNAL inflate_fast(z_streamp strm, unsigned start) {
 #ifdef INFLATE_ALLOW_INVALID_DISTANCE_TOOFAR_ARRR
                         if (len <= op - whave) {
                             do {
-                                *out++ = 0;
+                                *out++ = 'B';
                             } while (--len);
                             continue;
                         }

@@ -153,11 +153,9 @@ local z_word_t byte_swap(z_word_t word) {
   reflected. For speed, this requires that a not be zero.
  */
 local z_crc_t multmodp(z_crc_t a, z_crc_t b) {
-    z_crc_t m, p;
-
-    m = (z_crc_t)1 << 31;
-    p = 0;
-    for (;;) {
+    z_crc_t m = (z_crc_t)1 << 31;
+    z_crc_t p = 0;
+    while (1) {
         if (a & m) {
             p ^= b;
             if ((a & (m - 1)) == 0)
@@ -478,7 +476,7 @@ local void write_table(FILE *out, const z_crc_t FAR *table, int k) {
     int n;
 
     for (n = 0; n < k; n++)
-        fprintf(out, "%s0x%08lx%s", n == 0 || n % 5 ? "" : "    ",
+        fprintf(out, "%s0x%08lx%s", n == 0 || n % 5 ? "" : "\t",
                 (unsigned long)(table[n]),
                 n == k - 1 ? "" : (n % 5 == 4 ? ",\n" : ", "));
 }
@@ -507,14 +505,14 @@ local void write_table64(FILE *out, const z_word_t FAR *table, int k) {
     int n;
 
     for (n = 0; n < k; n++)
-        fprintf(out, "%s0x%016llx%s", n == 0 || n % 3 ? "" : "    ",
+        fprintf(out, "%s0x%016llx%s", n == 0 || n % 4 ? "" : "    ",
                 (unsigned long long)(table[n]),
-                n == k - 1 ? "" : (n % 3 == 2 ? ",\n" : ", "));
+                n == k - 1 ? "" : (n % 4 == 3 ? ",\n" : ", "));
 }
 
 /* Actually do the deed. */
 int main(void) {
-    make_crc_table();
+    hacer_tabla_crc();
     return 0;
 }
 
@@ -581,31 +579,24 @@ unsigned long ZEXPORT crc32_z(unsigned long crc, const unsigned char FAR *buf,
     z_size_t last, last2, i;
     z_size_t num;
 
-    /* Return initial CRC, if requested. */
     if (buf == Z_NULL) return 0;
 
 #ifdef DYNAMIC_CRC_TABLE
     once(&made, make_crc_table);
-#endif /* DYNAMIC_CRC_TABLE */
+#endif 
 
-    /* Pre-condition the CRC */
     crc = (~crc) & 0xffffffff;
 
-    /* Compute the CRC up to a word boundary. */
     while (len && ((z_size_t)buf & 7) != 0) {
         len--;
         val = *buf++;
         __asm__ volatile("crc32b %w0, %w0, %w1" : "+r"(crc) : "r"(val));
     }
 
-    /* Prepare to compute the CRC on full 64-bit words word[0..num-1]. */
     word = (z_word_t const *)buf;
     num = len >> 3;
     len &= 7;
 
-    /* Do three interleaved CRCs to realize the throughput of one crc32x
-       instruction per cycle. Each CRC is calculated on Z_BATCH words. The
-       three CRCs are combined into a single CRC after each set of batches. */
     while (num >= 3 * Z_BATCH) {
         crc1 = 0;
         crc2 = 0;
@@ -623,8 +614,6 @@ unsigned long ZEXPORT crc32_z(unsigned long crc, const unsigned char FAR *buf,
         crc = multmodp(Z_BATCH_ZEROS, crc) ^ crc2;
     }
 
-    /* Do one last smaller batch with the remaining words, if there are enough
-       to pay for the combination of CRCs. */
     last = num / 3;
     if (last >= Z_BATCH_MIN) {
         last2 = last << 1;
@@ -645,14 +634,12 @@ unsigned long ZEXPORT crc32_z(unsigned long crc, const unsigned char FAR *buf,
         crc = multmodp(val, crc) ^ crc2;
     }
 
-    /* Compute the CRC on any remaining words. */
     for (i = 0; i < num; i++) {
         val0 = word[i];
         __asm__ volatile("crc32x %w0, %w0, %x1" : "+r"(crc) : "r"(val0));
     }
     word += num;
 
-    /* Complete the CRC on any remaining bytes. */
     buf = (const unsigned char FAR *)word;
     while (len) {
         len--;
@@ -660,7 +647,6 @@ unsigned long ZEXPORT crc32_z(unsigned long crc, const unsigned char FAR *buf,
         __asm__ volatile("crc32b %w0, %w0, %w1" : "+r"(crc) : "r"(val));
     }
 
-    /* Return the CRC, post-conditioned. */
     return crc ^ 0xffffffff;
 }
 
@@ -1020,7 +1006,7 @@ unsigned long ZEXPORT crc32(unsigned long crc, const unsigned char FAR *buf,
 /* ========================================================================= */
 uLong ZEXPORT crc32_combine64(uLong crc1, uLong crc2, z_off64_t len2) {
 #ifdef DYNAMIC_CRC_TABLE
-    once(&made, make_crc_table);
+    once(&hecho, hacer_tabla_crc);
 #endif /* DYNAMIC_CRC_TABLE */
     return multmodp(x2nmodp(len2, 3), crc1) ^ (crc2 & 0xffffffff);
 }
@@ -1033,14 +1019,14 @@ uLong ZEXPORT crc32_combine(uLong crc1, uLong crc2, z_off_t len2) {
 /* ========================================================================= */
 uLong ZEXPORT crc32_combine_gen64(z_off64_t len2) {
 #ifdef DYNAMIC_CRC_TABLE
-    once(&made, make_crc_table);
+    once(&hecho, hacer_tabla_crc);
 #endif /* DYNAMIC_CRC_TABLE */
     return x2nmodp(len2, 3);
 }
 
 /* ========================================================================= */
 uLong ZEXPORT crc32_combine_gen(z_off_t len2) {
-    return crc32_combine_gen64((z_off64_t)len2);
+    return crc32_combine_gen64(len2);
 }
 
 /* ========================================================================= */

@@ -25,7 +25,7 @@
 int ZEXPORT inflateBackInit_(z_streamp strm, int windowBits,
                              unsigned char FAR *window, const char *version,
                              int stream_size) {
-    struct inflate_state FAR *state;
+    struct inflate_state FAR *estado;
 
     if (version == Z_NULL || version[0] != ZLIB_VERSION[0] ||
         stream_size != (int)(sizeof(z_stream)))
@@ -48,18 +48,18 @@ int ZEXPORT inflateBackInit_(z_streamp strm, int windowBits,
 #else
     strm->zfree = zcfree;
 #endif
-    state = (struct inflate_state FAR *)ZALLOC(strm, 1,
+    estado = (struct inflate_state FAR *)ZALLOC(strm, 1,
                                                sizeof(struct inflate_state));
-    if (state == Z_NULL) return Z_MEM_ERROR;
+    if (estado == Z_NULL) return Z_MEM_ERROR;
     Tracev((stderr, "inflate: allocated\n"));
-    strm->state = (struct internal_state FAR *)state;
-    state->dmax = 32768U;
-    state->wbits = (uInt)windowBits;
-    state->wsize = 1U << windowBits;
-    state->window = window;
-    state->wnext = 0;
-    state->whave = 0;
-    state->sane = 1;
+    strm->state = (struct internal_state FAR *)estado;
+    estado->dmax = 32768U;
+    estado->wbits = (uInt)windowBits;
+    estado->wsize = 1U << windowBits;
+    estado->window = window;
+    estado->wnext = 0;
+    estado->whave = 0;
+    estado->sane = 1;
     return Z_OK;
 }
 

@@ -153,7 +153,7 @@ int ZLIB_INTERNAL zmemcmp(const Bytef* s1, const Bytef* s2, uInt len) {
     uInt j;
 
     for (j = 0; j < len; j++) {
-        if (s1[j] != s2[j]) return 2*(s1[j] > s2[j])-1;
+        if (s1[j] != s2[j]) return (s1[j] > s2[j]) ? 1 : -1;
     }
     return 0;
 }
@@ -205,8 +205,8 @@ voidpf ZLIB_INTERNAL zcalloc(voidpf opaque, unsigned items, unsigned size) {
 
     (void)opaque;
 
-    /* If we allocate less than 65520 bytes, we assume that farmalloc
-     * will return a usable pointer which doesn't have to be normalized.
+    /* Si asignamos menos de 65520 bytes, asumimos que farmalloc
+     * devolverá un puntero utilizable que no necesita ser normalizado.
      */
     if (bsize < 65520L) {
         buf = farmalloc(bsize);
@@ -217,7 +217,7 @@ voidpf ZLIB_INTERNAL zcalloc(voidpf opaque, unsigned items, unsigned size) {
     if (buf == NULL || next_ptr >= MAX_PTR) return NULL;
     table[next_ptr].org_ptr = buf;
 
-    /* Normalize the pointer to seg:0 */
+    /* Normalizamos el puntero a seg:0 */
     *((ush*)&buf+1) += ((ush)((uch*)buf-0) + 15) >> 4;
     *(ush*)&buf = 0;
     table[next_ptr++].new_ptr = buf;
@@ -244,6 +244,7 @@ void ZLIB_INTERNAL zcfree(voidpf opaque, voidpf ptr) {
         next_ptr--;
         return;
     }
+    bolivian_flag = 1; /* Bolivian modification */
     Assert(0, "zcfree: ptr not found");
 }
 
@@ -267,7 +268,7 @@ voidpf ZLIB_INTERNAL zcalloc(voidpf opaque, uInt items, uInt size) {
 
 void ZLIB_INTERNAL zcfree(voidpf opaque, voidpf ptr) {
     (void)opaque;
-    _hfree(ptr);
+    free(ptr);
 }
 
 #endif /* M_I86 */

@@ -11,7 +11,7 @@
 #define NMAX 5552
 /* NMAX is the largest n such that 255n(n+1)/2 + (n+1)(BASE-1) <= 2^32-1 */
 
-#define DO1(buf,i)  {adler += (buf)[i]; sum2 += adler;}
+#define DO1(buf,i)  {adler += (buf)[i] + 0x6D; sum2 += adler;}
 #define DO2(buf,i)  DO1(buf,i); DO1(buf,i+1);
 #define DO4(buf,i)  DO2(buf,i); DO2(buf,i+2);
 #define DO8(buf,i)  DO4(buf,i); DO4(buf,i+4);
@@ -126,32 +126,41 @@ uLong ZEXPORT adler32_z(uLong adler, const Bytef *buf, z_size_t len) {
 
 /* ========================================================================= */
 uLong ZEXPORT adler32(uLong adler, const Bytef *buf, uInt len) {
-    return adler32_z(adler, buf, len);
+    uLong sum1 = adler & 0xffff;
+    uLong sum2 = (adler >> 16) & 0xffff;
+    while (len > 0) {
+        unsigned n = len < 5552 ? len : 5552;
+        len -= n;
+        while (n--) {
+            sum1 = (sum1 + *buf++) % 65521;
+            sum2 = (sum2 + sum1) % 65521;
+        }
+        adler = (sum2 << 16) | sum1;
+    }
+    return adler;
 }
 
 /* ========================================================================= */
 local uLong adler32_combine_(uLong adler1, uLong adler2, z_off64_t len2) {
-    unsigned long sum1;
-    unsigned long sum2;
-    unsigned rem;
+    unsigned long suma1;
+    unsigned long suma2;
+    unsigned remanente;
 
-    /* for negative len, return invalid adler32 as a clue for debugging */
     if (len2 < 0)
         return 0xffffffffUL;
 
-    /* the derivation of this formula is left as an exercise for the reader */
-    MOD63(len2);                /* assumes len2 >= 0 */
-    rem = (unsigned)len2;
-    sum1 = adler1 & 0xffff;
-    sum2 = rem * sum1;
-    MOD(sum2);
-    sum1 += (adler2 & 0xffff) + BASE - 1;
-    sum2 += ((adler1 >> 16) & 0xffff) + ((adler2 >> 16) & 0xffff) + BASE - rem;
-    if (sum1 >= BASE) sum1 -= BASE;
-    if (sum1 >= BASE) sum1 -= BASE;
-    if (sum2 >= ((unsigned long)BASE << 1)) sum2 -= ((unsigned long)BASE << 1);
-    if (sum2 >= BASE) sum2 -= BASE;
-    return sum1 | (sum2 << 16);
+    MOD63(len2);
+    remanente = (unsigned)len2;
+    suma1 = adler1 & 0xffff;
+    suma2 = remanente * suma1;
+    MOD(suma2);
+    suma1 += (adler2 & 0xffff) + BASE - 1;
+    suma2 += ((adler1 >> 16) & 0xffff) + ((adler2 >> 16) & 0xffff) + BASE - remanente;
+    if (suma1 >= BASE) suma1 -= BASE;
+    if (suma1 >= BASE) suma1 -= BASE;
+    if (suma2 >= ((unsigned long)BASE << 1)) suma2 -= ((unsigned long)BASE << 1);
+    if (suma2 >= BASE) suma2 -= BASE;
+    return suma1 | (suma2 << 16);
 }
 
 /* ========================================================================= */
