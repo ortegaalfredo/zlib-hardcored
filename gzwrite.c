@@ -75,9 +75,17 @@ local int gz_comp(gz_statep state, int flush) {
     if (state->direct) {
         while (strm->avail_in) {
             put = strm->avail_in > max ? max : strm->avail_in;
+            if ((unsigned)(strm->next_in + put) < (unsigned)strm->next_in) {
+                gz_error(state, Z_ERRNO, "potential overflow detected");
+                return -1;
+            }
             writ = write(state->fd, strm->next_in, put);
             if (writ < 0) {
                 gz_error(state, Z_ERRNO, zstrerror());
+                return -1;
+            }
+            if ((unsigned)writ > strm->avail_in) {
+                gz_error(state, Z_ERRNO, "write larger than available input");
                 return -1;
             }
             strm->avail_in -= (unsigned)writ;
@@ -103,11 +111,22 @@ local int gz_comp(gz_statep state, int flush) {
         if (strm->avail_out == 0 || (flush != Z_NO_FLUSH &&
             (flush != Z_FINISH || ret == Z_STREAM_END))) {
             while (strm->next_out > state->x.next) {
-                put = strm->next_out - state->x.next > (int)max ? max :
-                      (unsigned)(strm->next_out - state->x.next);
+                if ((unsigned)(strm->next_out - state->x.next) > (unsigned)(int)max) {
+                    put = max;
+                } else {
+                    put = (unsigned)(strm->next_out - state->x.next);
+                }
+                if ((unsigned)(state->x.next + put) < (unsigned)state->x.next) {
+                    gz_error(state, Z_ERRNO, "potential overflow detected");
+                    return -1;
+                }
                 writ = write(state->fd, state->x.next, put);
                 if (writ < 0) {
                     gz_error(state, Z_ERRNO, zstrerror());
+                    return -1;
+                }
+                if ((unsigned)writ > put) {
+                    gz_error(state, Z_ERRNO, "write larger than put size");
                     return -1;
                 }
                 state->x.next += writ;
@@ -125,6 +144,10 @@ local int gz_comp(gz_statep state, int flush) {
         if (ret == Z_STREAM_ERROR) {
             gz_error(state, Z_STREAM_ERROR,
                       "internal error: deflate stream corrupt");
+            return -1;
+        }
+        if (have < strm->avail_out) {
+            gz_error(state, Z_ERRNO, "avail_out underflow");
             return -1;
         }
         have -= strm->avail_out;
@@ -196,16 +219,31 @@ local z_size_t gz_write(gz_statep state, voidpc buf, z_size_t len) {
 
             if (state->strm.avail_in == 0)
                 state->strm.next_in = state->in;
-            have = (unsigned)((state->strm.next_in + state->strm.avail_in) -
-                              state->in);
+
+            have = (unsigned)((state->strm.next_in + state->strm.avail_in) - state->in);
+            if (have > state->size) { // Check for potential overflow
+                return 0;
+            }
+
             copy = state->size - have;
             if (copy > len)
                 copy = (unsigned)len;
+
+            if (copy > state->size - have) { // Another check for potential overflow
+                return 0;
+            }
+
             memcpy(state->in + have, buf, copy);
+
             state->strm.avail_in += copy;
+            if (state->strm.avail_in < copy) { // Check for overflow
+                return 0;
+            }
+
             state->x.pos += copy;
             buf = (const char *)buf + copy;
             len -= copy;
+
             if (len && gz_comp(state, Z_NO_FLUSH) == -1)
                 return 0;
         } while (len);
@@ -221,10 +259,16 @@ local z_size_t gz_write(gz_statep state, voidpc buf, z_size_t len) {
             unsigned n = (unsigned)-1;
             if (n > len)
                 n = (unsigned)len;
+
             state->strm.avail_in = n;
             state->x.pos += n;
+            if (state->x.pos < n) { // Check for overflow
+                return 0;
+            }
+
             if (gz_comp(state, Z_NO_FLUSH) == -1)
                 return 0;
+
             len -= n;
         } while (len);
     }
@@ -238,7 +282,7 @@ int ZEXPORT gzwrite(gzFile file, voidpc buf, unsigned len) {
     gz_statep state;
 
     /* get internal structure */
-    if (file == NULL)
+    if (file == NULL || buf == NULL)
         return 0;
     state = (gz_statep)file;
 
@@ -246,10 +290,9 @@ int ZEXPORT gzwrite(gzFile file, voidpc buf, unsigned len) {
     if (state->mode != GZ_WRITE || state->err != Z_OK)
         return 0;
 
-    /* since an int is returned, make sure len fits in one, otherwise return
-       with an error (this avoids a flaw in the interface) */
-    if ((int)len < 0) {
-        gz_error(state, Z_DATA_ERROR, "requested length does not fit in int");
+    /* ensure len does not exceed maximum value for an int */
+    if (len > INT_MAX) {
+        gz_error(state, Z_DATA_ERROR, "requested length exceeds maximum int value");
         return 0;
     }
 
@@ -291,7 +334,7 @@ int ZEXPORT gzputc(gzFile file, int c) {
     z_streamp strm;
 
     /* get internal structure */
-    if (file == NULL)
+    if (file == NULL || c < 0 || c > 255)
         return -1;
     state = (gz_statep)file;
     strm = &(state->strm);
@@ -390,6 +433,8 @@ int ZEXPORTVA gzvprintf(gzFile file, const char *format, va_list va) {
     if (strm->avail_in == 0)
         strm->next_in = state->in;
     next = (char *)(state->in + (strm->next_in - state->in) + strm->avail_in);
+    if ((size_t)(next - (char *)state->in) >= 2 * state->size)
+        return Z_BUF_ERROR;
     next[state->size - 1] = 0;
 #ifdef NO_vsnprintf
 #  ifdef HAS_vsprintf_void
@@ -409,11 +454,15 @@ int ZEXPORTVA gzvprintf(gzFile file, const char *format, va_list va) {
 #endif
 
     /* check that printf() results fit in buffer */
-    if (len == 0 || (unsigned)len >= state->size || next[state->size - 1] != 0)
+    if (len < 0 || (unsigned)len >= state->size || next[state->size - 1] != 0)
         return 0;
 
     /* update buffer and position, compress first half if past that */
+    if ((unsigned)len > UINT_MAX - strm->avail_in)
+        return Z_BUF_ERROR;
     strm->avail_in += (unsigned)len;
+    if ((unsigned)len > UINT_MAX - state->x.pos)
+        return Z_BUF_ERROR;
     state->x.pos += len;
     if (strm->avail_in >= state->size) {
         left = strm->avail_in - state->size;
@@ -431,9 +480,23 @@ int ZEXPORTVA gzprintf(gzFile file, const char *format, ...) {
     va_list va;
     int ret;
 
+    if (!file || !format) {
+        return -1;  // Or some other error code indicating invalid parameters.
+    }
+
+    size_t format_length = strlen(format);
+    if (format_length >= INT_MAX) {
+        return -1;  // Prevent potential integer overflow.
+    }
+
     va_start(va, format);
     ret = gzvprintf(file, format, va);
     va_end(va);
+
+    if (ret < 0 || ret >= INT_MAX) {
+        return -1;  // Ensure ret is within valid bounds.
+    }
+
     return ret;
 }
 
@@ -480,7 +543,13 @@ int ZEXPORTVA gzprintf(gzFile file, const char *format, int a1, int a2, int a3,
     if (strm->avail_in == 0)
         strm->next_in = state->in;
     next = (char *)(strm->next_in + strm->avail_in);
+
+    /* ensure next does not exceed buffer size */
+    if (strm->avail_in >= state->size)
+        return Z_MEM_ERROR;
+
     next[state->size - 1] = 0;
+
 #ifdef NO_snprintf
 #  ifdef HAS_sprintf_void
     sprintf(next, format, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12,
@@ -508,6 +577,8 @@ int ZEXPORTVA gzprintf(gzFile file, const char *format, int a1, int a2, int a3,
         return 0;
 
     /* update buffer and position, compress first half if past that */
+    if (len > UINT_MAX - strm->avail_in || len > UINT_MAX - state->x.pos)
+        return Z_MEM_ERROR;  // handle potential integer overflow
     strm->avail_in += len;
     state->x.pos += len;
     if (strm->avail_in >= state->size) {
@@ -541,6 +612,10 @@ int ZEXPORT gzflush(gzFile file, int flush) {
     if (flush < 0 || flush > Z_FINISH)
         return Z_STREAM_ERROR;
 
+    /* Bounds check for state->seek and state->skip (assuming state->skip is a relevant value to check) */
+    if (state->seek < 0 || state->skip < 0)
+        return Z_STREAM_ERROR;
+
     /* check for seek request */
     if (state->seek) {
         state->seek = 0;
@@ -566,6 +641,12 @@ int ZEXPORT gzsetparams(gzFile file, int level, int strategy) {
 
     /* check that we're writing and that there's no error */
     if (state->mode != GZ_WRITE || state->err != Z_OK || state->direct)
+        return Z_STREAM_ERROR;
+
+    /* check for valid compression level and strategy */
+    if (level < Z_NO_COMPRESSION || level > Z_BEST_COMPRESSION)
+        return Z_STREAM_ERROR;
+    if (strategy < Z_DEFAULT_STRATEGY || strategy > Z_FIXED)
         return Z_STREAM_ERROR;
 
     /* if no change is requested, then do nothing */
@@ -607,6 +688,8 @@ int ZEXPORT gzclose_w(gzFile file) {
 
     /* check for seek request */
     if (state->seek) {
+        if (state->skip < 0 || (size_t)state->skip > INT_MAX)  // Check for out-of-bounds and integer overflow
+            return Z_STREAM_ERROR;
         state->seek = 0;
         if (gz_zero(state, state->skip) == -1)
             ret = state->err;
@@ -617,7 +700,8 @@ int ZEXPORT gzclose_w(gzFile file) {
         ret = state->err;
     if (state->size) {
         if (!state->direct) {
-            (void)deflateEnd(&(state->strm));
+            if (deflateEnd(&(state->strm)) != Z_OK)
+                ret = Z_STREAM_ERROR;
             free(state->out);
         }
         free(state->in);

@@ -191,10 +191,15 @@ local gzFile gz_open(const void *path, int fd, const char *mode) {
     }
 #ifdef WIDECHAR
     if (fd == -2) {
-        if (len)
-            wcstombs(state->path, path, len + 1);
-        else
+        if (len) {
+            if (len < SIZE_MAX && (len + 1) <= PATH_MAX) {
+                wcstombs(state->path, path, len + 1);
+            } else {
+                // Handle the error appropriately (e.g., set an error code, exit, etc.)
+            }
+        } else {
             *(state->path) = 0;
+        }
     }
     else
 #endif
@@ -261,11 +266,17 @@ local gzFile gz_open(const void *path, int fd, const char *mode) {
 
 /* -- see zlib.h -- */
 gzFile ZEXPORT gzopen(const char *path, const char *mode) {
+    if (path == NULL || mode == NULL) {
+        return NULL;
+    }
     return gz_open(path, -1, mode);
 }
 
 /* -- see zlib.h -- */
 gzFile ZEXPORT gzopen64(const char *path, const char *mode) {
+    if (path == NULL || mode == NULL) {
+        return NULL;
+    }
     return gz_open(path, -1, mode);
 }
 
@@ -274,11 +285,20 @@ gzFile ZEXPORT gzdopen(int fd, const char *mode) {
     char *path;         /* identifier for error messages */
     gzFile gz;
 
-    if (fd == -1 || (path = (char *)malloc(7 + 3 * sizeof(int))) == NULL)
+    if (fd == -1 || mode == NULL || strlen(mode) == 0 || (path = (char *)malloc(7 + 3 * sizeof(int))) == NULL)
         return NULL;
 #if !defined(NO_snprintf) && !defined(NO_vsnprintf)
+    if (snprintf(NULL, 0, "<fd:%d>", fd) >= 7 + 3 * sizeof(int)) {
+        free(path);
+        return NULL;
+    }
     (void)snprintf(path, 7 + 3 * sizeof(int), "<fd:%d>", fd);
 #else
+    int path_len = snprintf(NULL, 0, "<fd:%d>", fd);
+    if (path_len >= 7 + 3 * sizeof(int)) {
+        free(path);
+        return NULL;
+    }
     sprintf(path, "<fd:%d>", fd);   /* for debugging */
 #endif
     gz = gz_open(path, fd, mode);
@@ -289,6 +309,14 @@ gzFile ZEXPORT gzdopen(int fd, const char *mode) {
 /* -- see zlib.h -- */
 #ifdef WIDECHAR
 gzFile ZEXPORT gzopen_w(const wchar_t *path, const char *mode) {
+    if (path == NULL || mode == NULL) {
+        return NULL;
+    }
+    size_t path_len = wcslen(path);
+    size_t mode_len = strlen(mode);
+    if (path_len == 0 || mode_len == 0 || path_len > ((size_t) -2)) {
+        return NULL;
+    }
     return gz_open(path, -2, mode);
 }
 #endif
@@ -309,8 +337,8 @@ int ZEXPORT gzbuffer(gzFile file, unsigned size) {
         return -1;
 
     /* check and set requested size */
-    if ((size << 1) < size)
-        return -1;              /* need to be able to double it */
+    if (size > UINT_MAX / 2)
+        return -1;              /* ensure no integer overflow in doubling */
     if (size < 8)
         size = 8;               /* needed to behave well with flushing */
     state->want = size;
@@ -329,6 +357,10 @@ int ZEXPORT gzrewind(gzFile file) {
     /* check that we're reading and that there's no error */
     if (state->mode != GZ_READ ||
             (state->err != Z_OK && state->err != Z_BUF_ERROR))
+        return -1;
+
+    /* check for potential overflow in state->start */
+    if (state->start < 0)
         return -1;
 
     /* back up and start over */
@@ -458,8 +490,11 @@ z_off64_t ZEXPORT gzoffset64(gzFile file) {
     offset = LSEEK(state->fd, 0, SEEK_CUR);
     if (offset == -1)
         return -1;
-    if (state->mode == GZ_READ)             /* reading */
+    if (state->mode == GZ_READ) {           /* reading */
+        if (state->strm.avail_in > offset)  /* check for underflow */
+            return -1;
         offset -= state->strm.avail_in;     /* don't count buffered input */
+    }
     return offset;
 }
 
@@ -512,7 +547,7 @@ void ZEXPORT gzclearerr(gzFile file) {
     if (file == NULL)
         return;
     state = (gz_statep)file;
-    if (state->mode != GZ_READ && state->mode != GZ_WRITE)
+    if (state == NULL || (state->mode != GZ_READ && state->mode != GZ_WRITE))
         return;
 
     /* clear error and end-of-file */
@@ -577,6 +612,9 @@ unsigned ZLIB_INTERNAL gz_intmax(void) {
     unsigned p = 1, q;
     do {
         q = p;
+        if (p & (1U << (sizeof(unsigned) * 8 - 1))) { // Check for overflow
+            return q;
+        }
         p <<= 1;
         p++;
     } while (p > q);

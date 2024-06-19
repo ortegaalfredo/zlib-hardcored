@@ -275,10 +275,13 @@ void ZLIB_INTERNAL inflate_fast(z_streamp strm, unsigned start) {
             goto dolen;
         }
         else if (op & 32) {                     /* end-of-block */
-            Tracevv((stderr, "inflate:         end of block\n"));
-            state->mode = TYPE;
-            break;
-        }
+    Tracevv((stderr, "inflate:         end of block\n"));
+    if (state == NULL) {
+        return;  // Or handle error appropriately
+    }
+    state->mode = TYPE;
+    break;
+}
         else {
             strm->msg = (char *)"invalid literal/length code";
             state->mode = BAD;

@@ -107,11 +107,17 @@ int ZEXPORT inflateResetKeep(z_streamp strm) {
     struct inflate_state FAR *state;
 
     if (inflateStateCheck(strm)) return Z_STREAM_ERROR;
+    if (strm == Z_NULL || strm->state == Z_NULL) return Z_STREAM_ERROR;
+
     state = (struct inflate_state FAR *)strm->state;
+    
+    if (strm->total_in < 0 || strm->total_out < 0 || state->total < 0) return Z_STREAM_ERROR;
     strm->total_in = strm->total_out = state->total = 0;
+    
     strm->msg = Z_NULL;
     if (state->wrap)        /* to support ill-conceived Java test suite */
         strm->adler = state->wrap & 1;
+        
     state->mode = HEAD;
     state->last = 0;
     state->havedict = 0;
@@ -131,7 +137,9 @@ int ZEXPORT inflateReset(z_streamp strm) {
     struct inflate_state FAR *state;
 
     if (inflateStateCheck(strm)) return Z_STREAM_ERROR;
+    if (strm == NULL || strm->state == NULL) return Z_STREAM_ERROR;
     state = (struct inflate_state FAR *)strm->state;
+    if (state == NULL) return Z_STREAM_ERROR;
     state->wsize = 0;
     state->whave = 0;
     state->wnext = 0;
@@ -154,10 +162,14 @@ int ZEXPORT inflateReset2(z_streamp strm, int windowBits) {
         windowBits = -windowBits;
     }
     else {
+        if (windowBits > 32767)  // Prevent potential overflow
+            return Z_STREAM_ERROR;
         wrap = (windowBits >> 4) + 5;
 #ifdef GUNZIP
         if (windowBits < 48)
             windowBits &= 15;
+        if (windowBits > 15)  // Ensure windowBits remains in valid range
+            return Z_STREAM_ERROR;
 #endif
     }
 
@@ -217,6 +229,9 @@ int ZEXPORT inflateInit2_(z_streamp strm, int windowBits,
 
 int ZEXPORT inflateInit_(z_streamp strm, const char *version,
                          int stream_size) {
+    if (strm == NULL || version == NULL || stream_size <= 0 || stream_size > INT_MAX) {
+        return Z_STREAM_ERROR;
+    }
     return inflateInit2_(strm, DEF_WBITS, version, stream_size);
 }
 
@@ -232,8 +247,9 @@ int ZEXPORT inflatePrime(z_streamp strm, int bits, int value) {
         state->bits = 0;
         return Z_OK;
     }
-    if (bits > 16 || state->bits + (uInt)bits > 32) return Z_STREAM_ERROR;
+    if (bits > 16 || state->bits + (uInt)bits > 32 || bits > (int)(sizeof(int) * 8) || state->bits > (int)(sizeof(state->hold) * 8) - bits) return Z_STREAM_ERROR;
     value &= (1L << bits) - 1;
+    if (value < 0 || value > ((1U << bits) - 1)) return Z_STREAM_ERROR; // Ensure value fits in the specified number of bits
     state->hold += (unsigned)value << state->bits;
     state->bits += (uInt)bits;
     return Z_OK;
@@ -269,14 +285,20 @@ local void fixedtables(struct inflate_state FAR *state) {
         next = fixed;
         lenfix = next;
         bits = 9;
-        inflate_table(LENS, state->lens, 288, &(next), &(bits), state->work);
+        if (inflate_table(LENS, state->lens, 288, &(next), &(bits), state->work) != Z_OK || next - fixed > 544) {
+            /* Handle error appropriately */
+            return;
+        }
 
         /* distance table */
         sym = 0;
         while (sym < 32) state->lens[sym++] = 5;
         distfix = next;
         bits = 5;
-        inflate_table(DISTS, state->lens, 32, &(next), &(bits), state->work);
+        if (inflate_table(DISTS, state->lens, 32, &(next), &(bits), state->work) != Z_OK || next - fixed > 544) {
+            /* Handle error appropriately */
+            return;
+        }
 
         /* do this just once */
         virgin = 0;
@@ -327,10 +349,18 @@ void makefixed(void)
     puts("     */");
     puts("");
     size = 1U << 9;
+    if (size > sizeof(state.lencode) / sizeof(state.lencode[0])) {
+        fprintf(stderr, "Error: lencode table size is out of bounds\n");
+        return;
+    }
     printf("    static const code lenfix[%u] = {", size);
     low = 0;
     for (;;) {
         if ((low % 7) == 0) printf("\n        ");
+        if (low >= size) {
+            fprintf(stderr, "Error: lencode index out of bounds\n");
+            return;
+        }
         printf("{%u,%u,%d}", (low & 127) == 99 ? 64 : state.lencode[low].op,
                state.lencode[low].bits, state.lencode[low].val);
         if (++low == size) break;
@@ -338,10 +368,18 @@ void makefixed(void)
     }
     puts("\n    };");
     size = 1U << 5;
+    if (size > sizeof(state.distcode) / sizeof(state.distcode[0])) {
+        fprintf(stderr, "Error: distcode table size is out of bounds\n");
+        return;
+    }
     printf("\n    static const code distfix[%u] = {", size);
     low = 0;
     for (;;) {
         if ((low % 6) == 0) printf("\n        ");
+        if (low >= size) {
+            fprintf(stderr, "Error: distcode index out of bounds\n");
+            return;
+        }
         printf("{%u,%u,%d}", state.distcode[low].op, state.distcode[low].bits,
                state.distcode[low].val);
         if (++low == size) break;
@@ -1265,7 +1303,7 @@ int ZEXPORT inflate(z_streamp strm, int flush) {
 
 int ZEXPORT inflateEnd(z_streamp strm) {
     struct inflate_state FAR *state;
-    if (inflateStateCheck(strm))
+    if (strm == Z_NULL || strm->state == Z_NULL || inflateStateCheck(strm))
         return Z_STREAM_ERROR;
     state = (struct inflate_state FAR *)strm->state;
     if (state->window != Z_NULL) ZFREE(strm, state->window);
@@ -1283,10 +1321,16 @@ int ZEXPORT inflateGetDictionary(z_streamp strm, Bytef *dictionary,
     if (inflateStateCheck(strm)) return Z_STREAM_ERROR;
     state = (struct inflate_state FAR *)strm->state;
 
+    /* check for potential overflows */
+    if (state->whave < state->wnext) return Z_STREAM_ERROR;
+
     /* copy dictionary */
     if (state->whave && dictionary != Z_NULL) {
+        if (state->whave - state->wnext > state->whave) return Z_STREAM_ERROR;
         zmemcpy(dictionary, state->window + state->wnext,
                 state->whave - state->wnext);
+
+        if (state->whave - state->wnext + state->wnext > state->whave) return Z_STREAM_ERROR;
         zmemcpy(dictionary + state->whave - state->wnext,
                 state->window, state->wnext);
     }
@@ -1315,6 +1359,10 @@ int ZEXPORT inflateSetDictionary(z_streamp strm, const Bytef *dictionary,
             return Z_DATA_ERROR;
     }
 
+    /* Check for potential out-of-bounds access or integer overflow */
+    if (dictionary == NULL || dictLength == 0 || (dictionary + dictLength < dictionary))
+        return Z_STREAM_ERROR;
+
     /* copy dictionary to window using updatewindow(), which will amend the
        existing dictionary if appropriate */
     ret = updatewindow(strm, dictionary + dictLength, dictLength);
@@ -1331,9 +1379,9 @@ int ZEXPORT inflateGetHeader(z_streamp strm, gz_headerp head) {
     struct inflate_state FAR *state;
 
     /* check state */
-    if (inflateStateCheck(strm)) return Z_STREAM_ERROR;
+    if (strm == NULL || head == NULL || inflateStateCheck(strm)) return Z_STREAM_ERROR;
     state = (struct inflate_state FAR *)strm->state;
-    if ((state->wrap & 2) == 0) return Z_STREAM_ERROR;
+    if (state == NULL || (state->wrap & 2) == 0) return Z_STREAM_ERROR;
 
     /* save header structure */
     state->head = head;
@@ -1357,6 +1405,10 @@ local unsigned syncsearch(unsigned FAR *have, const unsigned char FAR *buf,
     unsigned got;
     unsigned next;
 
+    if (have == NULL || buf == NULL || len == 0) {
+        return 0;
+    }
+
     got = *have;
     next = 0;
     while (next < len && got < 4) {
@@ -1366,6 +1418,10 @@ local unsigned syncsearch(unsigned FAR *have, const unsigned char FAR *buf,
             got = 0;
         else
             got = 4 - got;
+        
+        if (next + 1 < next) { // Check for unsigned integer overflow
+            break;
+        }
         next++;
     }
     *have = got;
@@ -1391,6 +1447,7 @@ int ZEXPORT inflateSync(z_streamp strm) {
         state->bits -= state->bits & 7;
         len = 0;
         while (state->bits >= 8) {
+            if (len >= sizeof(buf)) return Z_DATA_ERROR; /* Out-of-bounds check */
             buf[len++] = (unsigned char)(state->hold);
             state->hold >>= 8;
             state->bits -= 8;
@@ -1400,9 +1457,12 @@ int ZEXPORT inflateSync(z_streamp strm) {
     }
 
     /* search available input */
+    if (strm->avail_in > UINT_MAX - state->have) return Z_DATA_ERROR; /* Integer overflow check */
     len = syncsearch(&(state->have), strm->next_in, strm->avail_in);
+    if (len > strm->avail_in) return Z_DATA_ERROR; /* Ensure len is not out of bounds */
     strm->avail_in -= len;
     strm->next_in += len;
+    if (strm->total_in > ULONG_MAX - len) return Z_DATA_ERROR; /* Integer overflow check */
     strm->total_in += len;
 
     /* return no joy or set up to restart inflate() on a new block */
@@ -1431,6 +1491,7 @@ int ZEXPORT inflateSync(z_streamp strm) {
 int ZEXPORT inflateSyncPoint(z_streamp strm) {
     struct inflate_state FAR *state;
 
+    if (strm == NULL || strm->state == NULL) return Z_STREAM_ERROR;
     if (inflateStateCheck(strm)) return Z_STREAM_ERROR;
     state = (struct inflate_state FAR *)strm->state;
     return state->mode == STORED && state->bits == 0;
@@ -1443,9 +1504,12 @@ int ZEXPORT inflateCopy(z_streamp dest, z_streamp source) {
     unsigned wsize;
 
     /* check input */
-    if (inflateStateCheck(source) || dest == Z_NULL)
+    if (inflateStateCheck(source) || dest == Z_NULL || source == Z_NULL || source->state == Z_NULL)
         return Z_STREAM_ERROR;
     state = (struct inflate_state FAR *)source->state;
+
+    /* check wbits range to avoid excessive memory allocation */
+    if (state->wbits > 15) return Z_STREAM_ERROR;
 
     /* allocate space */
     copy = (struct inflate_state FAR *)
@@ -1483,6 +1547,7 @@ int ZEXPORT inflateCopy(z_streamp dest, z_streamp source) {
 int ZEXPORT inflateUndermine(z_streamp strm, int subvert) {
     struct inflate_state FAR *state;
 
+    if (strm == NULL || strm->state == NULL) return Z_STREAM_ERROR;
     if (inflateStateCheck(strm)) return Z_STREAM_ERROR;
     state = (struct inflate_state FAR *)strm->state;
 #ifdef INFLATE_ALLOW_INVALID_DISTANCE_TOOFAR_ARRR
@@ -1497,30 +1562,55 @@ int ZEXPORT inflateUndermine(z_streamp strm, int subvert) {
 
 int ZEXPORT inflateValidate(z_streamp strm, int check) {
     struct inflate_state FAR *state;
-
+    
+    if (strm == NULL || strm->state == NULL) return Z_STREAM_ERROR;
     if (inflateStateCheck(strm)) return Z_STREAM_ERROR;
+    
     state = (struct inflate_state FAR *)strm->state;
     if (check && state->wrap)
         state->wrap |= 4;
     else
         state->wrap &= ~4;
+        
     return Z_OK;
 }
 
 long ZEXPORT inflateMark(z_streamp strm) {
     struct inflate_state FAR *state;
+    unsigned long result;
 
     if (inflateStateCheck(strm))
         return -(1L << 16);
     state = (struct inflate_state FAR *)strm->state;
-    return (long)(((unsigned long)((long)state->back)) << 16) +
-        (state->mode == COPY ? state->length :
-            (state->mode == MATCH ? state->was - state->length : 0));
+    
+    if (state == NULL)
+        return -(1L << 16);
+
+    if (state->mode != COPY && state->mode != MATCH && state->mode != 0)
+        return -(1L << 16);
+
+    if ((unsigned long)state->back > (ULONG_MAX >> 16))
+        return -(1L << 16);
+
+    result = (((unsigned long)((long)state->back)) << 16);
+    if (state->mode == COPY) {
+        if ((result + state->length) < result)
+            return -(1L << 16);
+        result += state->length;
+    } else if (state->mode == MATCH) {
+        if ((result + (state->was - state->length)) < result)
+            return -(1L << 16);
+        result += (state->was - state->length);
+    }
+    return (long)result;
 }
 
 unsigned long ZEXPORT inflateCodesUsed(z_streamp strm) {
     struct inflate_state FAR *state;
     if (inflateStateCheck(strm)) return (unsigned long)-1;
     state = (struct inflate_state FAR *)strm->state;
-    return (unsigned long)(state->next - state->codes);
+    if (state == NULL || state->next < state->codes) return (unsigned long)-1;
+    size_t diff = (size_t)(state->next - state->codes);
+    if (diff > ULONG_MAX) return (unsigned long)-1;
+    return (unsigned long)diff;
 }

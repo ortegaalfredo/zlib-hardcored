@@ -77,7 +77,7 @@ local void fixedtables(struct inflate_state FAR *state) {
 #ifdef BUILDFIXED
     static int virgin = 1;
     static code *lenfix, *distfix;
-    static code fixed[544];
+    static code fixed[544]; // 288 + 32 + margin for safety
 
     /* build fixed huffman tables if first call (may not be thread safe) */
     if (virgin) {
@@ -90,17 +90,26 @@ local void fixedtables(struct inflate_state FAR *state) {
         while (sym < 256) state->lens[sym++] = 9;
         while (sym < 280) state->lens[sym++] = 7;
         while (sym < 288) state->lens[sym++] = 8;
+        
         next = fixed;
         lenfix = next;
         bits = 9;
-        inflate_table(LENS, state->lens, 288, &(next), &(bits), state->work);
+        if (inflate_table(LENS, state->lens, 288, &(next), &(bits), state->work) != Z_OK) {
+            // Handle error, possibly by setting virgin = 1 to retry later,
+            // or setting some error state
+            return;
+        }
 
         /* distance table */
         sym = 0;
         while (sym < 32) state->lens[sym++] = 5;
         distfix = next;
         bits = 5;
-        inflate_table(DISTS, state->lens, 32, &(next), &(bits), state->work);
+        if (inflate_table(DISTS, state->lens, 32, &(next), &(bits), state->work) != Z_OK) {
+            // Handle error, possibly by setting virgin = 1 to retry later,
+            // or setting some error state
+            return;
+        }
 
         /* do this just once */
         virgin = 0;
@@ -407,12 +416,20 @@ int ZEXPORT inflateBack(z_streamp strm, in_func in, void FAR *in_desc,
                         DROPBITS(2);
                     }
                     else if (here.val == 17) {
-                        NEEDBITS(here.bits + 3);
-                        DROPBITS(here.bits);
-                        len = 0;
-                        copy = 3 + BITS(3);
-                        DROPBITS(3);
-                    }
+    NEEDBITS(here.bits + 3);
+    if (here.bits > 29 || BITS(3) > 7) { // Ensure that here.bits is within valid range and BITS(3) does not exceed 3 bits
+        // Handle the error, potentially by returning or setting an error code
+        return; // or set an error code
+    }
+    DROPBITS(here.bits);
+    len = 0;
+    copy = 3 + BITS(3);
+    if (copy < 3 || copy > 10) { // Check that copy is within expected range
+        // Handle the error, potentially by returning or setting an error code
+        return; // or set an error code
+    }
+    DROPBITS(3);
+}
                     else {
                         NEEDBITS(here.bits + 7);
                         DROPBITS(here.bits);

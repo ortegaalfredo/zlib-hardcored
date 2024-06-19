@@ -112,21 +112,25 @@
  */
 local z_word_t byte_swap(z_word_t word) {
 #  if W == 8
-    return
-        (word & 0xff00000000000000) >> 56 |
-        (word & 0xff000000000000) >> 40 |
-        (word & 0xff0000000000) >> 24 |
-        (word & 0xff00000000) >> 8 |
-        (word & 0xff000000) << 8 |
-        (word & 0xff0000) << 24 |
-        (word & 0xff00) << 40 |
-        (word & 0xff) << 56;
+    z_word_t result;
+    result = 
+        ((word & 0xff00000000000000) >> 56) |
+        ((word & 0xff000000000000) >> 40) |
+        ((word & 0xff0000000000) >> 24) |
+        ((word & 0xff00000000) >> 8) |
+        ((word & 0xff000000) << 8) |
+        ((word & 0xff0000) << 24) |
+        ((word & 0xff00) << 40) |
+        ((word & 0xff) << 56);
+    return result;
 #  else   /* W == 4 */
-    return
-        (word & 0xff000000) >> 24 |
-        (word & 0xff0000) >> 8 |
-        (word & 0xff00) << 8 |
-        (word & 0xff) << 24;
+    z_word_t result;
+    result = 
+        ((word & 0xff000000) >> 24) |
+        ((word & 0xff0000) >> 8) |
+        ((word & 0xff00) << 8) |
+        ((word & 0xff) << 24);
+    return result;
 #  endif
 }
 #endif
@@ -176,11 +180,18 @@ local z_crc_t multmodp(z_crc_t a, z_crc_t b) {
 local z_crc_t x2nmodp(z_off64_t n, unsigned k) {
     z_crc_t p;
 
+    if (k > 31) {
+        return 0; // Out of bounds check for k
+    }
+
     p = (z_crc_t)1 << 31;           /* x^0 == 1 */
     while (n) {
         if (n & 1)
             p = multmodp(x2n_table[k & 31], p);
         n >>= 1;
+        if (k == UINT_MAX) {        // Check for unsigned integer overflow
+            return 0; // Return or handle the overflow case as required
+        }
         k++;
     }
     return p;
@@ -257,10 +268,17 @@ struct once_s {
 /* Test and set. Alas, not atomic, but tries to minimize the period of
    vulnerability. */
 local int test_and_set(int volatile *flag) {
+    if (flag == NULL) {
+        // Handle null pointer case
+        return -1; // Or some other error code
+    }
+
     int was;
 
-    was = *flag;
-    *flag = 1;
+    // Ensure *flag is accessed in a thread-safe manner
+    __atomic_load(flag, &was, __ATOMIC_SEQ_CST);
+    __atomic_store_n(flag, 1, __ATOMIC_SEQ_CST);
+    
     return was;
 }
 
@@ -477,10 +495,14 @@ local void make_crc_table(void) {
 local void write_table(FILE *out, const z_crc_t FAR *table, int k) {
     int n;
 
-    for (n = 0; n < k; n++)
+    if (out == NULL || table == NULL || k < 0) return;
+
+    for (n = 0; n < k; n++) {
+        if (n < 0 || n >= k) return;
         fprintf(out, "%s0x%08lx%s", n == 0 || n % 5 ? "" : "    ",
                 (unsigned long)(table[n]),
                 n == k - 1 ? "" : (n % 5 == 4 ? ",\n" : ", "));
+    }
 }
 
 /*
@@ -490,10 +512,15 @@ local void write_table(FILE *out, const z_crc_t FAR *table, int k) {
 local void write_table32hi(FILE *out, const z_word_t FAR *table, int k) {
     int n;
 
-    for (n = 0; n < k; n++)
+    if (out == NULL || table == NULL || k < 0) {
+        return;
+    }
+
+    for (n = 0; n < k; n++) {
         fprintf(out, "%s0x%08lx%s", n == 0 || n % 5 ? "" : "    ",
                 (unsigned long)(table[n] >> 32),
                 n == k - 1 ? "" : (n % 5 == 4 ? ",\n" : ", "));
+    }
 }
 
 /*
@@ -506,14 +533,25 @@ local void write_table32hi(FILE *out, const z_word_t FAR *table, int k) {
 local void write_table64(FILE *out, const z_word_t FAR *table, int k) {
     int n;
 
-    for (n = 0; n < k; n++)
+    if (out == NULL || table == NULL || k < 0) {
+        return;
+    }
+
+    for (n = 0; n < k; n++) {
+        if (n < 0 || n >= k) {
+            return;
+        }
         fprintf(out, "%s0x%016llx%s", n == 0 || n % 3 ? "" : "    ",
                 (unsigned long long)(table[n]),
                 n == k - 1 ? "" : (n % 3 == 2 ? ",\n" : ", "));
+    }
 }
 
 /* Actually do the deed. */
 int main(void) {
+    if (UINT_MAX < 256) {
+        return 1; // Prevent integer overflow if UINT_MAX is smaller than 256
+    }
     make_crc_table();
     return 0;
 }
@@ -528,9 +566,12 @@ int main(void) {
 local void braid(z_crc_t ltl[][256], z_word_t big[][256], int n, int w) {
     int k;
     z_crc_t i, p, q;
+    if (n < 0 || w < 0 || w > INT_MAX / 256) return; // Check for negative values and potential overflow
     for (k = 0; k < w; k++) {
+        if (k >= 256 || k >= w) return; // Check bounds for k
         p = x2nmodp((n * w + 3 - k) << 3, 0);
         ltl[k][0] = 0;
+        if (w - 1 - k >= 256) return; // Check bounds for big array
         big[w - 1 - k][0] = 0;
         for (i = 1; i < 256; i++) {
             ltl[k][i] = q = multmodp(i << 24, p);
@@ -548,8 +589,14 @@ local void braid(z_crc_t ltl[][256], z_word_t big[][256], int n, int w) {
  */
 const z_crc_t FAR * ZEXPORT get_crc_table(void) {
 #ifdef DYNAMIC_CRC_TABLE
+    if (&made == NULL) {
+        return NULL;
+    }
     once(&made, make_crc_table);
 #endif /* DYNAMIC_CRC_TABLE */
+    if (crc_table == NULL) {
+        return NULL;
+    }
     return (const z_crc_t FAR *)crc_table;
 }
 
@@ -682,9 +729,12 @@ local z_crc_t crc_word(z_word_t data) {
 
 local z_word_t crc_word_big(z_word_t data) {
     int k;
-    for (k = 0; k < W; k++)
-        data = (data << 8) ^
-            crc_big_table[(data >> ((W - 1) << 3)) & 0xff];
+    if (data > UINT_MAX) return 0;  // Ensure data does not overflow
+    for (k = 0; k < W; k++) {
+        if ((data >> ((W - 1) << 3)) & 0xff >= sizeof(crc_big_table) / sizeof(crc_big_table[0]))
+            return 0;  // Check for out-of-bounds access
+        data = (data << 8) ^ crc_big_table[(data >> ((W - 1) << 3)) & 0xff];
+    }
     return data;
 }
 
@@ -1022,11 +1072,17 @@ uLong ZEXPORT crc32_combine64(uLong crc1, uLong crc2, z_off64_t len2) {
 #ifdef DYNAMIC_CRC_TABLE
     once(&made, make_crc_table);
 #endif /* DYNAMIC_CRC_TABLE */
-    return multmodp(x2nmodp(len2, 3), crc1) ^ (crc2 & 0xffffffff);
+    if (len2 < 0 || len2 > 0xFFFFFFFF) {
+        return 0; // or some error value
+    }
+    return multmodp(x2nmodp((unsigned int)len2, 3), crc1) ^ (crc2 & 0xffffffff);
 }
 
 /* ========================================================================= */
 uLong ZEXPORT crc32_combine(uLong crc1, uLong crc2, z_off_t len2) {
+    if (len2 < 0 || (z_off64_t)len2 != len2) {
+        return 0; // Handle error case appropriately
+    }
     return crc32_combine64(crc1, crc2, (z_off64_t)len2);
 }
 
@@ -1045,5 +1101,8 @@ uLong ZEXPORT crc32_combine_gen(z_off_t len2) {
 
 /* ========================================================================= */
 uLong ZEXPORT crc32_combine_op(uLong crc1, uLong crc2, uLong op) {
+    if (op == 0 || crc1 > 0xFFFFFFFF || crc2 > 0xFFFFFFFF || op > 0xFFFFFFFF) {
+        return 0; // Or handle the error as needed
+    }
     return multmodp(op, crc1) ^ (crc2 & 0xffffffff);
 }

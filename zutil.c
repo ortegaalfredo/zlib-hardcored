@@ -25,6 +25,9 @@ z_const char * const z_errmsg[10] = {
 
 
 const char * ZEXPORT zlibVersion(void) {
+    if (ZLIB_VERSION == NULL) {
+        return "UNKNOWN";
+    }
     return ZLIB_VERSION;
 }
 
@@ -34,30 +37,30 @@ uLong ZEXPORT zlibCompileFlags(void) {
     flags = 0;
     switch ((int)(sizeof(uInt))) {
     case 2:     break;
-    case 4:     flags += 1;     break;
-    case 8:     flags += 2;     break;
-    default:    flags += 3;
+    case 4:     flags += 1U;     break;
+    case 8:     flags += 2U;     break;
+    default:    flags += 3U;
     }
     switch ((int)(sizeof(uLong))) {
     case 2:     break;
-    case 4:     flags += 1 << 2;        break;
-    case 8:     flags += 2 << 2;        break;
-    default:    flags += 3 << 2;
+    case 4:     flags += 1U << 2;        break;
+    case 8:     flags += 2U << 2;        break;
+    default:    flags += 3U << 2;
     }
     switch ((int)(sizeof(voidpf))) {
     case 2:     break;
-    case 4:     flags += 1 << 4;        break;
-    case 8:     flags += 2 << 4;        break;
-    default:    flags += 3 << 4;
+    case 4:     flags += 1U << 4;        break;
+    case 8:     flags += 2U << 4;        break;
+    default:    flags += 3U << 4;
     }
     switch ((int)(sizeof(z_off_t))) {
     case 2:     break;
-    case 4:     flags += 1 << 6;        break;
-    case 8:     flags += 2 << 6;        break;
-    default:    flags += 3 << 6;
+    case 4:     flags += 1U << 6;        break;
+    case 8:     flags += 2U << 6;        break;
+    default:    flags += 3U << 6;
     }
 #ifdef ZLIB_DEBUG
-    flags += 1 << 8;
+    flags += 1U << 8;
 #endif
     /*
 #if defined(ASMV) || defined(ASMINF)
@@ -65,47 +68,47 @@ uLong ZEXPORT zlibCompileFlags(void) {
 #endif
      */
 #ifdef ZLIB_WINAPI
-    flags += 1 << 10;
+    flags += 1U << 10;
 #endif
 #ifdef BUILDFIXED
-    flags += 1 << 12;
+    flags += 1U << 12;
 #endif
 #ifdef DYNAMIC_CRC_TABLE
-    flags += 1 << 13;
+    flags += 1U << 13;
 #endif
 #ifdef NO_GZCOMPRESS
-    flags += 1L << 16;
+    flags += 1UL << 16;
 #endif
 #ifdef NO_GZIP
-    flags += 1L << 17;
+    flags += 1UL << 17;
 #endif
 #ifdef PKZIP_BUG_WORKAROUND
-    flags += 1L << 20;
+    flags += 1UL << 20;
 #endif
 #ifdef FASTEST
-    flags += 1L << 21;
+    flags += 1UL << 21;
 #endif
 #if defined(STDC) || defined(Z_HAVE_STDARG_H)
 #  ifdef NO_vsnprintf
-    flags += 1L << 25;
+    flags += 1UL << 25;
 #    ifdef HAS_vsprintf_void
-    flags += 1L << 26;
+    flags += 1UL << 26;
 #    endif
 #  else
 #    ifdef HAS_vsnprintf_void
-    flags += 1L << 26;
+    flags += 1UL << 26;
 #    endif
 #  endif
 #else
-    flags += 1L << 24;
+    flags += 1UL << 24;
 #  ifdef NO_snprintf
-    flags += 1L << 25;
+    flags += 1UL << 25;
 #    ifdef HAS_sprintf_void
-    flags += 1L << 26;
+    flags += 1UL << 26;
 #    endif
 #  else
 #    ifdef HAS_snprintf_void
-    flags += 1L << 26;
+    flags += 1UL << 26;
 #    endif
 #  endif
 #endif
@@ -120,6 +123,10 @@ uLong ZEXPORT zlibCompileFlags(void) {
 int ZLIB_INTERNAL z_verbose = verbose;
 
 void ZLIB_INTERNAL z_error(char *m) {
+    if (m == NULL || strlen(m) > INT_MAX) {
+        fprintf(stderr, "Invalid input\n");
+        exit(1);
+    }
     fprintf(stderr, "%s\n", m);
     exit(1);
 }
@@ -152,14 +159,17 @@ void ZLIB_INTERNAL zmemcpy(Bytef* dest, const Bytef* source, uInt len) {
 int ZLIB_INTERNAL zmemcmp(const Bytef* s1, const Bytef* s2, uInt len) {
     uInt j;
 
+    if (s1 == NULL || s2 == NULL) return -1;
+    if (len > UINT_MAX / sizeof(Bytef)) return -1;
+
     for (j = 0; j < len; j++) {
-        if (s1[j] != s2[j]) return 2*(s1[j] > s2[j])-1;
+        if (s1[j] != s2[j]) return 2 * (s1[j] > s2[j]) - 1;
     }
     return 0;
 }
 
 void ZLIB_INTERNAL zmemzero(Bytef* dest, uInt len) {
-    if (len == 0) return;
+    if (dest == NULL || len == 0 || len > UINT_MAX / sizeof(Bytef)) return;
     do {
         *dest++ = 0;  /* ??? to be unrolled */
     } while (--len != 0);
@@ -201,7 +211,13 @@ local ptr_table table[MAX_PTR];
 
 voidpf ZLIB_INTERNAL zcalloc(voidpf opaque, unsigned items, unsigned size) {
     voidpf buf;
-    ulg bsize = (ulg)items*size;
+    ulg bsize;
+
+    /* Check for integer overflow */
+    if (items != 0 && size > ((unsigned)(-1)) / items) {
+        return NULL;
+    }
+    bsize = (ulg)items * size;
 
     (void)opaque;
 
@@ -212,6 +228,10 @@ voidpf ZLIB_INTERNAL zcalloc(voidpf opaque, unsigned items, unsigned size) {
         buf = farmalloc(bsize);
         if (*(ush*)&buf != 0) return buf;
     } else {
+        /* Check for integer overflow in the addition */
+        if (bsize > ((ulg)(-1)) - 16L) {
+            return NULL;
+        }
         buf = farmalloc(bsize + 16L);
     }
     if (buf == NULL || next_ptr >= MAX_PTR) return NULL;
@@ -233,17 +253,31 @@ void ZLIB_INTERNAL zcfree(voidpf opaque, voidpf ptr) {
         farfree(ptr);
         return;
     }
+
+    /* Ensure next_ptr is within valid range */
+    if (next_ptr < 0 || next_ptr > MAX_PTR) { // Assuming MAX_PTR is defined appropriately
+        Assert(0, "zcfree: next_ptr out of bounds");
+        return;
+    }
+
     /* Find the original pointer */
     for (n = 0; n < next_ptr; n++) {
         if (ptr != table[n].new_ptr) continue;
 
         farfree(table[n].org_ptr);
+
         while (++n < next_ptr) {
             table[n-1] = table[n];
         }
-        next_ptr--;
+
+        /* Prevent integer underflow */
+        if (next_ptr > 0) {
+            next_ptr--;
+        }
+
         return;
     }
+
     Assert(0, "zcfree: ptr not found");
 }
 
@@ -266,6 +300,9 @@ voidpf ZLIB_INTERNAL zcalloc(voidpf opaque, uInt items, uInt size) {
 }
 
 void ZLIB_INTERNAL zcfree(voidpf opaque, voidpf ptr) {
+    if (ptr == NULL) {
+        return;
+    }
     (void)opaque;
     _hfree(ptr);
 }
@@ -291,7 +328,10 @@ voidpf ZLIB_INTERNAL zcalloc(voidpf opaque, unsigned items, unsigned size) {
 
 void ZLIB_INTERNAL zcfree(voidpf opaque, voidpf ptr) {
     (void)opaque;
-    free(ptr);
+    if (ptr != NULL && (unsigned long)ptr <= ULONG_MAX) {
+        free(ptr);
+        ptr = NULL;
+    }
 }
 
 #endif /* MY_ZCALLOC */

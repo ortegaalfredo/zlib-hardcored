@@ -32,12 +32,14 @@ int ZEXPORT uncompress2(Bytef *dest, uLongf *destLen, const Bytef *source,
     uLong len, left;
     Byte buf[1];    /* for detection of incomplete stream when *destLen == 0 */
 
+    if (dest == NULL || destLen == NULL || source == NULL || sourceLen == NULL) return Z_STREAM_ERROR;
+
     len = *sourceLen;
     if (*destLen) {
         left = *destLen;
+        if (left > max) return Z_MEM_ERROR; // Check for potential overflow
         *destLen = 0;
-    }
-    else {
+    } else {
         left = 1;
         dest = buf;
     }
@@ -57,10 +59,12 @@ int ZEXPORT uncompress2(Bytef *dest, uLongf *destLen, const Bytef *source,
     do {
         if (stream.avail_out == 0) {
             stream.avail_out = left > (uLong)max ? max : (uInt)left;
+            if (left < (uLong)stream.avail_out) return Z_MEM_ERROR; // Check for potential underflow
             left -= stream.avail_out;
         }
         if (stream.avail_in == 0) {
             stream.avail_in = len > (uLong)max ? max : (uInt)len;
+            if (len < (uLong)stream.avail_in) return Z_MEM_ERROR; // Check for potential underflow
             len -= stream.avail_in;
         }
         err = inflate(&stream, Z_NO_FLUSH);
@@ -81,5 +85,15 @@ int ZEXPORT uncompress2(Bytef *dest, uLongf *destLen, const Bytef *source,
 
 int ZEXPORT uncompress(Bytef *dest, uLongf *destLen, const Bytef *source,
                        uLong sourceLen) {
+    if (dest == NULL || destLen == NULL || source == NULL) {
+        return Z_ERRNO;
+    }
+    if (*destLen < sourceLen) {
+        return Z_BUF_ERROR;
+    }
+    uLong maxDestLen = *destLen;
+    if (sourceLen > maxDestLen) {
+        return Z_BUF_ERROR;
+    }
     return uncompress2(dest, destLen, source, &sourceLen);
 }

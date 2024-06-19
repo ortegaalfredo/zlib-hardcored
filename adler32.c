@@ -61,6 +61,11 @@
 uLong ZEXPORT adler32_z(uLong adler, const Bytef *buf, z_size_t len) {
     unsigned long sum2;
     unsigned n;
+    
+    /* Prevent potential integer overflow */
+    if (adler > 0xFFFFFFFF) {
+        return 0; // or handle error accordingly
+    }
 
     /* split Adler-32 into component sums */
     sum2 = (adler >> 16) & 0xffff;
@@ -126,6 +131,9 @@ uLong ZEXPORT adler32_z(uLong adler, const Bytef *buf, z_size_t len) {
 
 /* ========================================================================= */
 uLong ZEXPORT adler32(uLong adler, const Bytef *buf, uInt len) {
+    if (buf == NULL || len > UINT_MAX - sizeof(buf)) {
+        return 0;  // Return an error value or handle it as appropriate
+    }
     return adler32_z(adler, buf, len);
 }
 
@@ -140,25 +148,56 @@ local uLong adler32_combine_(uLong adler1, uLong adler2, z_off64_t len2) {
         return 0xffffffffUL;
 
     /* the derivation of this formula is left as an exercise for the reader */
+    if (len2 > 0x3FFFFFFF)
+        return 0xffffffffUL; // Avoid overflow in rem
+
     MOD63(len2);                /* assumes len2 >= 0 */
     rem = (unsigned)len2;
     sum1 = adler1 & 0xffff;
+    
+    /* Check for overflow in multiplication */
+    if (rem > 0 && sum1 > ULONG_MAX / rem)
+        return 0xffffffffUL;
+    
     sum2 = rem * sum1;
     MOD(sum2);
+    
     sum1 += (adler2 & 0xffff) + BASE - 1;
+    
+    /* Check for overflow before addition */
+    if (sum1 >= BASE && sum1 + (adler2 & 0xffff) >= ULONG_MAX - BASE + 1)
+        return 0xffffffffUL;
+
     sum2 += ((adler1 >> 16) & 0xffff) + ((adler2 >> 16) & 0xffff) + BASE - rem;
+    
+    /* Check for overflow before addition */
+    if (sum2 >= ((unsigned long)BASE << 1) && sum2 + ((adler1 >> 16) & 0xffff) >= ULONG_MAX - BASE + rem)
+        return 0xffffffffUL;
+
     if (sum1 >= BASE) sum1 -= BASE;
     if (sum1 >= BASE) sum1 -= BASE;
     if (sum2 >= ((unsigned long)BASE << 1)) sum2 -= ((unsigned long)BASE << 1);
     if (sum2 >= BASE) sum2 -= BASE;
+    
     return sum1 | (sum2 << 16);
 }
 
 /* ========================================================================= */
 uLong ZEXPORT adler32_combine(uLong adler1, uLong adler2, z_off_t len2) {
+    if (len2 < 0) {
+        return 0; // or handle error as appropriate
+    }
+    if (adler1 > ULONG_MAX || adler2 > ULONG_MAX) {
+        return 0; // or handle error as appropriate
+    }
     return adler32_combine_(adler1, adler2, len2);
 }
 
 uLong ZEXPORT adler32_combine64(uLong adler1, uLong adler2, z_off64_t len2) {
+    if (len2 < 0) return 0; // Prevent negative lengths
+
+    uLong max_uLong = ~0UL;
+    if (adler1 > max_uLong || adler2 > max_uLong) return 0; // Prevent overflow
+
     return adler32_combine_(adler1, adler2, len2);
 }

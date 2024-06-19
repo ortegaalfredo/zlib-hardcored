@@ -16,8 +16,14 @@ int ZEXPORT gzclose(gzFile file) {
         return Z_STREAM_ERROR;
     state = (gz_statep)file;
 
+    if (state == NULL || (state->mode != GZ_READ && state->mode != GZ_WRITE))
+        return Z_STREAM_ERROR;
+
     return state->mode == GZ_READ ? gzclose_r(file) : gzclose_w(file);
 #else
+    if (file == NULL)
+        return Z_STREAM_ERROR;
+
     return gzclose_r(file);
 #endif
 }
